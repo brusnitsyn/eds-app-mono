@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+    display: none;
+}
+
+@layer base {
+    @font-face {
+        font-family: "v-sans";
+        font-weight: 400;
+        src: url("/fonts/Golos-Text_Regular.ttf");
+    }
+
+    @font-face {
+        font-family: "v-sans";
+        font-weight: 500;
+        src: url("/fonts/Golos-Text_Medium.ttf");
+    }
+
+    @font-face {
+        font-family: "v-sans";
+        font-weight: 600;
+        src: url("/fonts/Golos-Text_DemiBold.ttf");
+    }
+
+    @font-face {
+        font-family: "v-sans";
+        font-weight: 700;
+        src: url("/fonts/Golos-Text_Bold.ttf");
+    }
+
+    @font-face {
+        font-family: "v-sans";
+        font-weight: 800;
+        src: url("/fonts/Golos-Text_Black.ttf");
+    }
+}

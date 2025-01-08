@@ -1,0 +1,206 @@
+<script setup>
+import AppLayout from "@/Layouts/AppLayout.vue"
+import {NDataTable, NText, NButton, NIcon, NSpace, NFlex, NRadioGroup, NRadioButton, NInputGroup, NSelect, NInput, NModal} from 'naive-ui'
+import {computed, h, ref} from "vue"
+import {IconSquareRoundedPlus, IconFileSpreadsheet, IconSearch} from '@tabler/icons-vue'
+import {format, toDate} from 'date-fns'
+import {Link, Head, router, usePage, useForm} from "@inertiajs/vue3";
+import {debounce} from "@/Utils/debounce.js";
+import CreateStaffForm from "@/Pages/Staff/Partials/CreateStaffForm.vue";
+
+defineProps({
+    staffs: Array
+})
+
+const columns = [
+    {
+        type: 'selection',
+    },
+    {
+        title: 'ID',
+        key: 'id',
+        width: 50,
+    },
+    {
+        title: 'ФИО',
+        key: 'full_name',
+        width: 280,
+        sorter: 'default',
+        sortOrder: false,
+        render(row) {
+            return h(
+                Link,
+                {
+                    href: `/staff/${row.id}`,
+                },
+                {
+                    default: () => row.full_name,
+                }
+            )
+        }
+    },
+    {
+        title: 'СНИЛС',
+        key: 'snils',
+        width: 120,
+        sorter: 'default',
+        sortOrder: false,
+    },
+    {
+        title: 'Действует до',
+        key: 'certification.valid_to',
+        width: 140,
+        sortOrder: false,
+        sorter: 'default',
+        render(row) {
+            return h(
+                NText,
+                null,
+                {
+                    default: () => format(toDate(Number(row.certification.valid_to)), 'dd.MM.yyyy'),
+                }
+            )
+        }
+    },
+    {
+        title: 'Должность',
+        key: 'job_title',
+        sortOrder: false,
+        sorter: 'default',
+        ellipsis: {
+            tooltip: true
+        }
+    },
+    // {
+    //     title: '',
+    //     key: 'actions',
+    //     width: 60,
+    //     render(row) {
+    //         return h(
+    //             NFlex,
+    //             {
+    //
+    //             },
+    //             {
+    //                 default: () => h(
+    //                     NDropdown,
+    //                     {
+    //                         trigger: 'click',
+    //                         placement: 'bottom-end',
+    //                         options: rowOptions.value,
+    //                         onSelect: (key, option) => option.onClick(row)
+    //                     },
+    //                     {
+    //                         default: () => h(NButton, { text: true, class: 'text-xl' }, { default: () => h(NIcon, null, { default: () => h(IconDots) }) })
+    //                     }
+    //                 )
+    //             }
+    //         )
+    //     }
+    // }
+]
+
+const staffType = ref(router.page.props.ziggy.query.valid_type)
+const computedStaffType = computed({
+    get() {
+        return staffType.value
+    },
+    set(value) {
+        staffType.value = value
+        router.get('/staff', { ...router.page.props.ziggy.query, valid_type: value }, { preserveState: true })
+    }
+})
+
+const selectSearchStaffOptions = [
+    {
+        label: 'ФИО',
+        value: 'full_name'
+    }
+]
+
+const selectedSearchStaffOption = ref(selectSearchStaffOptions[0].value)
+
+const searchStaffValue = ref(router.page.props.ziggy.query.search_value)
+
+const debounceSearchStaffValue = computed({
+    get() {
+        return searchStaffValue.value
+    },
+    set(value) {
+        searchStaffValue.value = value
+        form.search_value = value
+        debounce(searchStaff, 600)
+    }
+})
+
+const form = useForm({ valid_type: null, search_field: 'full_name', search_value: null })
+
+function searchStaff() {
+    form.get('/staff', { preserveState: true })
+    // router.get('/staff', { ...router.page.props.ziggy.query, search_field: 'full_name', search_value: searchStaffValue.value }, { preserveState: true })
+    // console.log(searchStaffValue.value)
+}
+
+const hasShowCreateStaffModal = ref(false)
+</script>
+
+<template>
+
+    <Head title="Персонал" />
+
+    <AppLayout>
+        <template #header>
+            Персонал
+        </template>
+        <template #subheader>
+            <NSpace vertical>
+                <NFlex justify="space-between" align="center">
+                    <NRadioGroup v-model:value="computedStaffType" :disabled="form.processing">
+                        <NRadioButton label="Все" :value="null" />
+                        <NRadioButton label="Требующие перевыпуск" value="new-request" />
+                        <NRadioButton label="Недействительные" value="no-valid" />
+                    </NRadioGroup>
+
+<!--                    <NButton v-if="checkedRows.length" secondary :disabled="status === 'pending'" @click="downloadCert">-->
+<!--                        <template #icon>-->
+<!--                            <IconFileZip />-->
+<!--                        </template>-->
+<!--                        Скачать-->
+<!--                    </NButton>-->
+                </NFlex>
+                <NInputGroup>
+                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />
+                    <NInput v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="Значение поиска" @keydown.enter.prevent="searchStaff" :loading="form.processing" />
+                    <NButton :loading="form.processing" size="large" @click="searchStaff">
+                        <template #icon>
+                            <NIcon :component="IconSearch" />
+                        </template>
+                    </NButton>
+                </NInputGroup>
+            </NSpace>
+        </template>
+        <template #headermore>
+            <NButton type="tertiary" :disabled="form.processing" :loading="form.processing">
+                <template #icon>
+                    <NIcon :component="IconFileSpreadsheet" />
+                </template>
+                Экспортировать
+            </NButton>
+            <NButton type="primary" @click="hasShowCreateStaffModal = true" :disabled="form.processing" :loading="form.processing">
+                <template #icon>
+                    <NIcon :component="IconSquareRoundedPlus" />
+                </template>
+                Добавить
+            </NButton>
+        </template>
+        <NDataTable :columns="columns" :data="staffs" class="h-[620px]" flex-height :loading="form.processing" />
+    </AppLayout>
+
+    <NModal v-model:show="hasShowCreateStaffModal" preset="card" class="max-w-2xl" title="Добавить персону" :bordered="false">
+        <CreateStaffForm @success="hasShowCreateStaffModal = false" />
+    </NModal>
+</template>
+
+<style scoped>
+
+</style>
