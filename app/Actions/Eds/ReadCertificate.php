@@ -2,9 +2,11 @@
 
 namespace App\Actions\Eds;
 
+use App\Facades\Crypto;
 use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpZip\ZipFile;
@@ -109,10 +111,20 @@ class ReadCertificate
         $certificationInfo['certificate']['path_certification'] = $certificateDirectory;
         $certificationInfo['certificate']['file_certification'] = $certificateFile;
 
-        $createrStaff = new CreateNewStaff();
-        $createrStaff->create($certificationInfo);
+        $createdStaff = new CreateNewStaff();
+        $createdStaff->create($certificationInfo);
 
         Storage::disk('temp')->deleteDirectory($extractedCertificatePath);
+
+        $certificateFiles = collect(Storage::disk('certification')->files($cerFileName, true));
+        $certificateFiles = $certificateFiles->map(function ($path) {
+            return Storage::disk('certification')->path($path);
+        });
+        $certificateFiles = $certificateFiles->all();
+
+        foreach ($certificateFiles as $file) {
+            Crypto::encryptFile($file);
+        }
     }
 
     public function readMany(UploadedFile|File $archiveFile)
@@ -158,8 +170,8 @@ class ReadCertificate
             $certificationInfo['certificate']['path_certification'] = $certificateDirectory;
             $certificationInfo['certificate']['file_certification'] = $certificateFile;
 
-            $createrStaff = new CreateNewStaff();
-            $createrStaff->create($certificationInfo);
+            $createdStaff = new CreateNewStaff();
+            $createdStaff->create($certificationInfo);
         }
 
         Storage::disk('temp')->deleteDirectory($extractedTempPackagesPath);
