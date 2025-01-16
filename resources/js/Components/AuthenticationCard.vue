@@ -4,7 +4,7 @@
             <slot name="logo" />
         </div>
 
-        <NCard class="max-w-md mt-6">
+        <NCard class="max-w-md mt-4">
             <slot />
         </NCard>
     </div>

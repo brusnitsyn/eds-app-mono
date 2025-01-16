@@ -8,6 +8,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import NaiveLayout from "@/Layouts/NaiveLayout.vue";
+import ApplicationLogo from "@/Components/ApplicationLogo.vue";
 
 defineProps({
     canResetPassword: Boolean,
@@ -65,6 +66,9 @@ function submit(e) {
 
     <NaiveLayout message-placement="bottom">
         <AuthenticationCard>
+            <template #logo>
+                <NImage src="/assets/svg/logo.svg" width="82" height="82" preview-disabled />
+            </template>
             <NForm @submit.prevent="submit" :model="form" :rules="rules" ref="formRef">
                 <NFormItem label="Имя пользователя" path="login">
                     <NInput v-model:value="form.login" placeholder="" />
