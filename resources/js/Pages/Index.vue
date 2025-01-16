@@ -1,20 +1,16 @@
 <script setup>
-import { NButton } from 'naive-ui'
 import AppLayout from "@/Layouts/AppLayout.vue";
+import DashboardItem from "@/Components/Dashboard/DashboardItem.vue";
 </script>
 
 <template>
     <AppLayout title="Главная">
-        <template #header>
-            Персонал
-        </template>
-        <template #subheader>
-            Lorem ipsum dolor sit amet, consectetur adipisicing elit. Ad alias consequatur consequuntur doloremque dolorum eveniet explicabo hic id impedit magnam maxime nemo placeat provident qui quidem, quis quo unde velit.
-        </template>
         <div>
-            <NButton>
-                Кнопка?
-            </NButton>
+            <NGrid cols="2 s:3 m:3 l:4 xl:5" responsive="screen" x-gap="8" y-gap="8">
+                <NGi>
+                    <DashboardItem :href="route('staff.index')" title="Персонал" refresh-hidden />
+                </NGi>
+            </NGrid>
         </div>
     </AppLayout>
 </template>

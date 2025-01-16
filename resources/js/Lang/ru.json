@@ -1,0 +1,17 @@
+{
+    "pages": {
+        "staff": "Персонал",
+        "staff-id": "{person}",
+        "journal": "Журнал",
+        "journals": "Журналы",
+        "patient-falling": "Журнал регистрации падений пациентов и посетителей"
+    },
+    "fallingPatient": {
+        "id": "ИД",
+        "full_name_patient": "ФИО пациента",
+        "reason_event": "Причина падения",
+        "place_event": "Место падения",
+        "has_helping": "Проведено мероприятие",
+        "consequences": "Последствия"
+    }
+}

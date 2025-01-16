@@ -146,12 +146,7 @@ const hasShowCreateStaffModal = ref(false)
 
 <template>
 
-    <Head title="Персонал" />
-
     <AppLayout>
-        <template #header>
-            Персонал
-        </template>
         <template #subheader>
             <NSpace vertical>
                 <NFlex justify="space-between" align="center">
@@ -190,7 +185,7 @@ const hasShowCreateStaffModal = ref(false)
                 <template #icon>
                     <NIcon :component="IconSquareRoundedPlus" />
                 </template>
-                Добавить
+                Добавить персону
             </NButton>
         </template>
         <NDataTable :columns="columns" :data="staffs" class="h-[620px]" flex-height :loading="form.processing" />

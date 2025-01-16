@@ -1,15 +1,17 @@
 <script setup>
 import {computed, h, ref} from 'vue'
 import {Head, Link, router, usePage} from '@inertiajs/vue3'
-import {IconDoorExit, IconSettings2, IconUserHexagon, IconUsers, IconMenu3} from '@tabler/icons-vue'
+import {IconDoorExit, IconMinusVertical, IconArrowLeft, IconUsers, IconMenu3, IconTable} from '@tabler/icons-vue'
 import Banner from '@/Components/Banner.vue'
 import {NIcon} from "naive-ui"
 import {useStorage} from "@vueuse/core"
 import packageJson from "../../../package.json"
 import NaiveLayout from "@/Layouts/NaiveLayout.vue"
 import {isLargeScreen, isMediumScreen, isSmallScreen} from "@/Utils/mediaQuery.js";
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 
-defineProps({
+const props = defineProps({
     title: String,
 });
 
@@ -25,7 +27,7 @@ const switchToTeam = (team) => {
     });
 }
 
-const largeMenuCollapsed = ref(false)
+const largeMenuCollapsed = useStorage('side-collapsed', false)
 const mobileMenuCollapsed = ref(false)
 
 function renderIcon(icon) {
@@ -37,7 +39,7 @@ const menuOptions = [
         label: () => h(
             Link,
             {
-                href: '/staff',
+                href: route('staff.index'),
             },
             {
                 default: () => 'Персонал'
@@ -50,14 +52,14 @@ const menuOptions = [
         label: () => h(
             Link,
             {
-                href: '/journal',
+                href: route('journals.index'),
             },
             {
                 default: () => 'Журналы'
             }
         ),
-        key: 'Journal',
-        icon: renderIcon(IconUsers)
+        key: 'Journals',
+        icon: renderIcon(IconTable)
     },
 ]
 
@@ -76,15 +78,35 @@ const currentRoute = computed(() => {
 
 const user = ref(page.props.auth.user)
 
-console.log(page.props)
+// console.log(page.props)
 const showWelcomeDialog = ref(false)
-
-
-const lastUpdate = useStorage('lastUpdate', null)
-if (!lastUpdate.value || lastUpdate.value !== packageJson.version) {
+const lastUpdate = useStorage('last-update', null)
+if (!lastUpdate.value || lastUpdate.value !== packageJson.date) {
     showWelcomeDialog.value = true
-    localStorage.setItem('lastUpdate', '2022-01-01')
 }
+
+const breabcrumbs = computed(() => {
+    const pathParts = page?.url?.split('/').filter((part) => part?.trim() !== '');
+    return pathParts?.map((part, partIndex) => {
+        const previousParts = pathParts.slice(0, partIndex);
+        return {
+            label: part,
+            href: previousParts?.length > 0 ? `/${previousParts?.join('/')}/${part}` : `/${part}`,
+            isLast: Boolean(previousParts?.length)
+        }
+    }) || []
+})
+
+const activeTitle = computed(() => {
+    if (props.title) {
+        return props.title
+    }
+
+    const pathParts = page?.props.ziggy.location.split('/').filter((part) => part?.trim() !== '')
+    return t(`pages.${pathParts.pop()}`)
+})
+
+console.log(page)
 
 const logout = () => {
     router.post(route('logout'));
@@ -93,20 +115,23 @@ const logout = () => {
 </script>
 
 <template>
-    <Head :title="title" />
+    <Head :title="activeTitle" />
     <NaiveLayout>
         <Banner />
 
         <div class="h-screen max-h-screen bg-gray-100">
             <NLayout position="absolute">
-                <NLayoutHeader class="p-3.5 px-[24px]" bordered>
-                    <NFlex justify="space-between" align="center">
-                        <Link href="/">
-                            EDS
+                <NLayoutHeader class="py-3.5 px-[24px]" bordered>
+                    <NFlex justify="space-between" align="center" class="relative">
+                        <Link href="/" class="flex items-center gap-x-4">
+                            <NImage src="/assets/svg/logo-short.svg" preview-disabled width="32" height="32" class="h-8 w-8" />
+                            <span class="text-lg">
+                                УЦОД
+                            </span>
                         </Link>
                         <NSpace class="-m-5 -mr-[24px]" :size="0">
                             <NDropdown v-if="user && isLargeScreen" trigger="click" placement="top-end" :options="userOptions" @select="(key, option) => option.onClick()">
-                                <NButton quaternary class="h-[50px] rounded-none hidden md:block">
+                                <NButton quaternary class="h-[61px] rounded-none hidden md:block">
                                     <NSpace align="center">
                                         <NSpace vertical align="end" :size="2">
                                             <NText class="font-semibold">
@@ -120,23 +145,42 @@ const logout = () => {
                                     </NSpace>
                                 </NButton>
                             </NDropdown>
-                            <NButton v-if="!isLargeScreen" quaternary class="h-[50px] w-[50px] rounded-none" @click="mobileMenuCollapsed = true">
+                            <NButton v-if="!isLargeScreen" quaternary class="h-[61px] w-[61px] rounded-none" @click="mobileMenuCollapsed = true">
                                 <NIcon :component="IconMenu3" />
                             </NButton>
                         </NSpace>
                     </NFlex>
                 </NLayoutHeader>
-                <NLayout has-sider position="absolute" style="top: 50px; bottom: 46px">
-                    <NLayoutSider v-if="isLargeScreen" collapse-mode="width" collapsed-width="0" width="240" :collapsed="largeMenuCollapsed" show-trigger @collapse="largeMenuCollapsed = true"
+                <NLayout has-sider position="absolute" style="top: 61px; bottom: 46px">
+                    <NLayoutSider v-if="isLargeScreen" collapse-mode="width" collapsed-width="0" width="260" :collapsed="largeMenuCollapsed" show-trigger @collapse="largeMenuCollapsed = true"
                                   @expand="largeMenuCollapsed = false" :collapsed-trigger-class="largeMenuCollapsed === true ? '!-right-5 !top-1/4' : ''" trigger-class="!top-1/4" bordered content-class="">
                         <NMenu :options="menuOptions" :value="currentRoute" />
                     </NLayoutSider>
                     <NLayout content-class="px-4 py-5 lg:px-14 lg:py-7">
                         <main>
-                            <NFlex v-if="$slots.header || $slots.headermore" justify="space-between" align="center" class="mb-5">
-                                <NH1 v-if="$slots.header" class="!mb-0">
-                                    <slot name="header" />
-                                </NH1>
+                            <NFlex justify="space-between" align="center" class="mb-5">
+                                <NSpace vertical :size="0">
+                                    <NBreadcrumb v-if="breabcrumbs.length > 1">
+                                        <template v-for="breadcrumb in breabcrumbs" :key="breadcrumb.label">
+                                            <NBreadcrumbItem v-if="!breadcrumb.isLast">
+                                                <Link :href="!breadcrumb.isLast ? breadcrumb.href : ''">
+                                                    {{ t(`pages.${breadcrumb.label}`) }}
+                                                </Link>
+                                            </NBreadcrumbItem>
+                                        </template>
+                                    </NBreadcrumb>
+                                    <NFlex align="center" justify="center" :size="6">
+<!--                                        <NButton text>-->
+<!--                                            <template #icon>-->
+<!--                                                <NIcon :component="IconArrowLeft" size="28" />-->
+<!--                                            </template>-->
+<!--                                        </NButton>-->
+<!--                                        <NDivider vertical class="!h-[25px] !bg-[#1f2225]" />-->
+                                        <NH1 class="!my-0">
+                                            {{ activeTitle }}
+                                        </NH1>
+                                    </NFlex>
+                                </NSpace>
                                 <NSpace>
                                     <slot name="headermore" />
                                 </NSpace>
@@ -177,21 +221,21 @@ const logout = () => {
                 <NMenu :options="menuOptions" :value="currentRoute" />
             </NDrawerContent>
         </NDrawer>
-        <NModal v-model:show="showWelcomeDialog" preset="card" class="max-w-xl" :mask-closable="false">
+        <NModal v-model:show="showWelcomeDialog" preset="card" class="max-w-xl" :mask-closable="false" @after-leave="lastUpdate = packageJson.date">
             <template #header>
                 <NSpace vertical :size="0">
                     <NText class="text-base">
                         ЧТО НОВОГО
                     </NText>
-                    <NFlex size="small" align="center">
+                    <NSpace inline justify="center" :size="4" align="center">
                         <NTag type="primary" size="small">
                             {{ packageJson.version }}
                         </NTag>
-                        <div class="text-sm">
+                        <NText class="text-sm">
                             от
-                        </div>
+                        </NText>
                         <NTime :time="packageJson.date" format="dd.MM.yyyy" class="text-sm" />
-                    </NFlex>
+                    </NSpace>
                 </NSpace>
             </template>
             <div class="bg-white">
@@ -200,3 +244,7 @@ const logout = () => {
         </NModal>
     </NaiveLayout>
 </template>
+
+<style>
+
+</style>
