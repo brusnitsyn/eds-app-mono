@@ -40,7 +40,7 @@ function handleUpload() {
         </NSpace>
         <NFlex justify="space-between" align="center">
             <NCheckbox v-model:checked="form.is_package" label="Архив содержит несколько сертификатов" />
-            <NButton type="primary" @click="handleUpload" :loading="form.processing" :disabled="form.certificate === null">Загрузить</NButton>
+            <NButton type="primary" @click="handleUpload" :loading="form.processing" :disabled="form.certificate === null">Добавить персону</NButton>
         </NFlex>
     </NFlex>
 </template>
