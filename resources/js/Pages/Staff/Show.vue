@@ -24,39 +24,39 @@ const props = defineProps({
 </script>
 
 <template>
-    <AppLayout>
+    <AppLayout :title="staff.full_name">
         <NGrid :cols="5" :x-gap="16">
             <NGi span="3">
                 <NSpace vertical class="max-w-3xl">
-                    <NCard class="relative">
-                        <NFlex class="absolute top-4 right-4">
-                            <NTag v-if="staff.mis_user_id != null" type="info" round>
-                                ТМ:МИС {{ format(new Date(staff.mis_sync_at), 'dd.MM.yyyy') }} в {{ format(new Date(staff.mis_sync_at), 'HH:mm') }}
-                                <template #icon>
-                                    <NIcon :component="IconProgressCheck" :size="20" />
-                                </template>
-                            </NTag>
-                        </NFlex>
-                        <NButton class="absolute top-2 left-0 -translate-x-1/2" :style="{ border: '1px', borderColor: useThemeVars().value.borderColor, borderStyle: 'solid' }" :color="useThemeVars().value.cardColor" :text-color="useThemeVars().value.textColor3" circle>
-                            <template #icon>
-                                <NIcon :component="IconChevronLeft" />
-                            </template>
-                        </NButton>
-                        <NAvatar round :size="120" class="font-bold text-3xl">
-                            {{ staff.last_name[0] }}{{ staff.first_name[0] }}
-                        </NAvatar>
-                        <template #action>
-                            <NFlex justify="space-between" align="center">
-                                <NText class="text-lg font-bold">
-                                    {{ staff.full_name }}
-                                </NText>
+<!--                    <NCard class="relative">-->
+<!--                        <NFlex class="absolute top-4 right-4">-->
+<!--                            <NTag v-if="staff.mis_user_id != null" type="info" round>-->
+<!--                                ТМ:МИС {{ format(new Date(staff.mis_sync_at), 'dd.MM.yyyy') }} в {{ format(new Date(staff.mis_sync_at), 'HH:mm') }}-->
+<!--                                <template #icon>-->
+<!--                                    <NIcon :component="IconProgressCheck" :size="20" />-->
+<!--                                </template>-->
+<!--                            </NTag>-->
+<!--                        </NFlex>-->
+<!--                        <NButton class="absolute top-2 left-0 -translate-x-1/2" :style="{ border: '1px', borderColor: useThemeVars().value.borderColor, borderStyle: 'solid' }" :color="useThemeVars().value.cardColor" :text-color="useThemeVars().value.textColor3" circle>-->
+<!--                            <template #icon>-->
+<!--                                <NIcon :component="IconChevronLeft" />-->
+<!--                            </template>-->
+<!--                        </NButton>-->
+<!--                        <NAvatar round :size="120" class="font-bold text-3xl">-->
+<!--                            {{ staff.last_name[0] }}{{ staff.first_name[0] }}-->
+<!--                        </NAvatar>-->
+<!--                        <template #action>-->
+<!--                            <NFlex justify="space-between" align="center">-->
+<!--                                <NText class="text-lg font-bold">-->
+<!--                                    {{ staff.full_name }}-->
+<!--                                </NText>-->
 
-                                <NText v-if="staff.mis_user_id">
-                                    #{{ staff.mis_user_id }}
-                                </NText>
-                            </NFlex>
-                        </template>
-                    </NCard>
+<!--                                <NText v-if="staff.mis_user_id">-->
+<!--                                    #{{ staff.mis_user_id }}-->
+<!--                                </NText>-->
+<!--                            </NFlex>-->
+<!--                        </template>-->
+<!--                    </NCard>-->
 
 <!--                    <NAlert v-if="hasAlerValid" title="Сертификат действителен" type="success" />-->
 <!--                    <NAlert v-if="hasAlerNewRequest" title="Срок действия сертификата подходит к концу" type="warning" />-->

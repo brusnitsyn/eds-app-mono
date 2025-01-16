@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('event_at');
             $table->foreignIdFor(\App\Models\Division::class);
-            $table->foreignIdFor(\App\Models\JournalType::class);
             $table->string('full_name_patient')->nullable();
             $table->string('reason_event')->nullable();
             $table->string('place_event')->nullable();
