@@ -19,6 +19,7 @@ class UserSeeder extends Seeder
             'name' => 'Администратор',
             'email' => 'admin@admin.com',
             'password' => Hash::make('!23qwe'),
+            'role_id' => 1
         ]);
     }
 }
