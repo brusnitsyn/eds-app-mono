@@ -13,30 +13,39 @@ class StaffController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Staff::query();
-        $searchField = $request->query('search_field', 'full_name');
         $searchValue = $request->query('search_value');
+        if ($searchValue)
+            $query = Staff::search($searchValue);
+        else
+            $query = Staff::query();
+
         $validType = $request->query('valid_type');
-
-        if (isset($searchValue)) {
-            $query->where($searchField, 'ilike', Str::lower($searchValue) . '%');
-        }
-
+        $searchWhereParams = collect();
         if (isset($validType)) {
             switch ($validType) {
                 case 'no-valid':
-                    $query->whereHas('certification', function ($query) {
-                        $query->where('is_valid', false);
-                    });
+                    $searchWhereParams->push('is_valid', 0);
                     break;
                 case 'new-request':
-                    $query->whereHas('certification', function ($query) {
-                        $query->where('is_request_new', true);
-                    });
+                    $searchWhereParams->push('is_request_new', 1);
                     break;
             }
         }
 
+        // Если фильтр не пуст
+        if ($searchWhereParams->isNotEmpty()) {
+            $searchWhereParams = $searchWhereParams->toArray();
+            $query = $query->where($searchWhereParams[0], $searchWhereParams[1]);
+        }
+
+        $query = $query->get();
+
+        if ($query->isEmpty()) {
+            return Inertia::render('Staff/Index', [
+                'staffs' => []
+            ]);
+        }
+        $query = $query->toQuery();
 
         $staffs = $query->with('certification')->get();
         return Inertia::render('Staff/Index', [
