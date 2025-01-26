@@ -78,11 +78,11 @@ const clearPhotoFileInput = () => {
 <template>
     <FormSection @submitted="updateProfileInformation">
         <template #title>
-            Profile Information
+            Информация о профиле
         </template>
 
         <template #description>
-            Update your account's profile information and email address.
+            Обновите информацию профиля и адрес электронной почты вашей учетной записи.
         </template>
 
         <template #form>
@@ -128,53 +128,49 @@ const clearPhotoFileInput = () => {
                 <InputError :message="form.errors.photo" class="mt-2" />
             </div>
 
-            <!-- Name -->
-            <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="name" value="Name" />
-                <TextInput
+            <!-- Имя -->
+            <NFormItemGi label="Имя" span="6" class="col-span-6 sm:col-span-4">
+                <NInput
                     id="name"
-                    v-model="form.name"
+                    v-model:value="form.name"
                     type="text"
-                    class="mt-1 block w-full"
-                    required
                     autocomplete="name"
                 />
-                <InputError :message="form.errors.name" class="mt-2" />
-            </div>
+            </NFormItemGi>
 
-            <!-- Email -->
-            <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="email" value="Email" />
-                <TextInput
-                    id="email"
-                    v-model="form.email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    required
-                    autocomplete="username"
-                />
-                <InputError :message="form.errors.email" class="mt-2" />
+<!--            &lt;!&ndash; Email &ndash;&gt;-->
+<!--            <div class="col-span-6 sm:col-span-4">-->
+<!--                <InputLabel for="email" value="Email" />-->
+<!--                <TextInput-->
+<!--                    id="email"-->
+<!--                    v-model="form.email"-->
+<!--                    type="email"-->
+<!--                    class="mt-1 block w-full"-->
+<!--                    required-->
+<!--                    autocomplete="username"-->
+<!--                />-->
+<!--                <InputError :message="form.errors.email" class="mt-2" />-->
 
-                <div v-if="$page.props.jetstream.hasEmailVerification && user.email_verified_at === null">
-                    <p class="text-sm mt-2">
-                        Your email address is unverified.
+<!--                <div v-if="$page.props.jetstream.hasEmailVerification && user.email_verified_at === null">-->
+<!--                    <p class="text-sm mt-2">-->
+<!--                        Your email address is unverified.-->
 
-                        <Link
-                            :href="route('verification.send')"
-                            method="post"
-                            as="button"
-                            class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            @click.prevent="sendEmailVerification"
-                        >
-                            Click here to re-send the verification email.
-                        </Link>
-                    </p>
+<!--                        <Link-->
+<!--                            :href="route('verification.send')"-->
+<!--                            method="post"-->
+<!--                            as="button"-->
+<!--                            class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"-->
+<!--                            @click.prevent="sendEmailVerification"-->
+<!--                        >-->
+<!--                            Click here to re-send the verification email.-->
+<!--                        </Link>-->
+<!--                    </p>-->
 
-                    <div v-show="verificationLinkSent" class="mt-2 font-medium text-sm text-green-600">
-                        A new verification link has been sent to your email address.
-                    </div>
-                </div>
-            </div>
+<!--                    <div v-show="verificationLinkSent" class="mt-2 font-medium text-sm text-green-600">-->
+<!--                        A new verification link has been sent to your email address.-->
+<!--                    </div>-->
+<!--                </div>-->
+<!--            </div>-->
         </template>
 
         <template #actions>
@@ -182,9 +178,9 @@ const clearPhotoFileInput = () => {
                 Saved.
             </ActionMessage>
 
-            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                Save
-            </PrimaryButton>
+            <NButton type="primary" attr-type="submit" :loading="form.processing" :disabled="form.processing">
+                Сохранить
+            </NButton>
         </template>
     </FormSection>
 </template>

@@ -163,8 +163,8 @@ const hasShowCreateStaffModal = ref(false)
 <!--                        Скачать-->
 <!--                    </NButton>-->
                 </NFlex>
-                <NInputGroup>
-                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />
+                <NInputGroup class="max-w-xl">
+<!--                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />-->
                     <NInput v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="Значение поиска" @keydown.enter.prevent="searchStaff" :loading="form.processing" />
                     <NButton :loading="form.processing" size="large" @click="searchStaff">
                         <template #icon>

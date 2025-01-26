@@ -45,16 +45,16 @@ const closeModal = () => {
 <template>
     <ActionSection>
         <template #title>
-            Browser Sessions
+            Сеансы
         </template>
 
         <template #description>
-            Manage and log out your active sessions on other browsers and devices.
+            Управляйте и выходите из своих активных сеансов на других браузерах и устройствах.
         </template>
 
         <template #content>
             <div class="max-w-xl text-sm text-gray-600">
-                If necessary, you may log out of all of your other browser sessions across all of your devices. Some of your recent sessions are listed below; however, this list may not be exhaustive. If you feel your account has been compromised, you should also update your password.
+                Если необходимо, вы можете выйти из всех своих активных сеансов во всех браузерах и на всех устройствах. Некоторые из ваших недавних сеансов перечислены ниже; однако этот список может быть неполным. Если вы считаете, что ваша учетная запись была скомпрометирована, вам также следует обновить пароль.
             </div>
 
             <!-- Other Browser Sessions -->
@@ -72,15 +72,15 @@ const closeModal = () => {
 
                     <div class="ms-3">
                         <div class="text-sm text-gray-600">
-                            {{ session.agent.platform ? session.agent.platform : 'Unknown' }} - {{ session.agent.browser ? session.agent.browser : 'Unknown' }}
+                            {{ session.agent.platform ? session.agent.platform : 'Неизвестное устройство' }} - {{ session.agent.browser ? session.agent.browser : 'Неизвестное устройство' }}
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500">
                                 {{ session.ip_address }},
 
-                                <span v-if="session.is_current_device" class="text-green-500 font-semibold">This device</span>
-                                <span v-else>Last active {{ session.last_active }}</span>
+                                <span v-if="session.is_current_device" class="text-green-500 font-semibold">Это устройство</span>
+                                <span v-else>Последняя активность {{ session.last_active }}</span>
                             </div>
                         </div>
                     </div>
@@ -89,7 +89,7 @@ const closeModal = () => {
 
             <div class="flex items-center mt-5">
                 <PrimaryButton @click="confirmLogout">
-                    Log Out Other Browser Sessions
+                    Выйти из других сеансов браузера
                 </PrimaryButton>
 
                 <ActionMessage :on="form.recentlySuccessful" class="ms-3">
