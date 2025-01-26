@@ -1,7 +1,15 @@
 <script setup>
 import {computed, h, ref} from 'vue'
 import {Head, Link, router, usePage} from '@inertiajs/vue3'
-import {IconDoorExit, IconMinusVertical, IconArrowLeft, IconUsers, IconMenu3, IconTable} from '@tabler/icons-vue'
+import {
+    IconDoorExit,
+    IconMinusVertical,
+    IconArrowLeft,
+    IconUsers,
+    IconMenu3,
+    IconTable,
+    IconUser
+} from '@tabler/icons-vue'
 import Banner from '@/Components/Banner.vue'
 import {NIcon} from "naive-ui"
 import {useStorage} from "@vueuse/core"
@@ -9,6 +17,7 @@ import packageJson from "../../../package.json"
 import NaiveLayout from "@/Layouts/NaiveLayout.vue"
 import {isLargeScreen, isMediumScreen, isSmallScreen} from "@/Utils/mediaQuery.js";
 import { useI18n } from 'vue-i18n'
+import {useCheckScope} from "@/Composables/useCheckScope.js";
 const { t } = useI18n()
 
 const props = defineProps({
@@ -33,7 +42,7 @@ const mobileMenuCollapsed = ref(false)
 function renderIcon(icon) {
     return () => h(NIcon, null, { default: () => h(icon) })
 }
-
+const scopes = inject('scopes')
 const menuOptions = [
     {
         label: () => h(
@@ -46,7 +55,8 @@ const menuOptions = [
             }
         ),
         key: 'Staff',
-        icon: renderIcon(IconUsers)
+        icon: renderIcon(IconUsers),
+        show: useCheckScope([scopes.CAN_READ_STAFF])
     },
     {
         label: () => h(
@@ -59,11 +69,32 @@ const menuOptions = [
             }
         ),
         key: 'Journals',
-        icon: renderIcon(IconTable)
+        icon: renderIcon(IconTable),
+        show: useCheckScope([scopes.CAN_READ_JOURNALS])
     },
+    {
+        label: () => h(
+            Link,
+            {
+                href: route('admin.index'),
+            },
+            {
+                default: () => 'Администрирование'
+            }
+        ),
+        key: 'Admin',
+        icon: renderIcon(IconTable),
+        show: useCheckScope([scopes.CAN_ADMIN])
+    }
 ]
 
 const userOptions = [
+    {
+        label: 'Мой профиль',
+        key: 'my-profile',
+        icon: renderIcon(IconUser),
+        onClick: () => router.visit(route('profile.show'))
+    },
     {
         label: 'Выйти из учетной записи',
         key: 'user-exit',
@@ -106,8 +137,6 @@ const activeTitle = computed(() => {
     return t(`pages.${pathParts.pop()}`)
 })
 
-console.log(page)
-
 const logout = () => {
     router.post(route('logout'));
     router.reload()
@@ -138,7 +167,7 @@ const logout = () => {
                                                 {{ user.name }}
                                             </NText>
                                             <NText>
-                                                {{ user.login }}
+                                                {{ user.role.name }}
                                             </NText>
                                         </NSpace>
                                         <NAvatar :src="user.profile_photo_url" round />
@@ -169,7 +198,7 @@ const logout = () => {
                                             </NBreadcrumbItem>
                                         </template>
                                     </NBreadcrumb>
-                                    <NFlex align="center" justify="center" :size="6">
+                                    <NFlex align="center" justify="start" :size="6">
 <!--                                        <NButton text>-->
 <!--                                            <template #icon>-->
 <!--                                                <NIcon :component="IconArrowLeft" size="28" />-->
