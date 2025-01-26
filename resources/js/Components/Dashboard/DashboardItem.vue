@@ -1,12 +1,13 @@
 <script setup>
 import {IconExternalLink, IconRefresh} from "@tabler/icons-vue";
+import { Link } from "@inertiajs/vue3"
 const props = defineProps({
     title: {
         type: String,
         default: 'Заголовок карты'
     },
     subtitle: {
-        type: String,
+        type: [String, Number],
         default: '999'
     },
     href: {
@@ -22,7 +23,7 @@ const emits = defineEmits(['clickRefresh', 'clickNavigate'])
 
 <template>
     <NCard :title="title" header-class="!pb-2" footer-class="!p-0">
-        <NP v-if="props.subtitle" class="text-3xl font-medium">
+        <NP v-if="props.subtitle !== null" class="text-3xl font-medium">
             {{ props.subtitle }}
         </NP>
         <template #footer>
@@ -34,12 +35,14 @@ const emits = defineEmits(['clickRefresh', 'clickNavigate'])
                     </template>
                     Обновить
                 </NButton>
-                <NButton tag="a" :href="props.href" class="rounded-none h-10" :block="refreshHidden" :class="refreshHidden ? '' : 'w-[calc(50%+1px)] -ml-px'">
-                    <template #icon>
-                        <NIcon :component="IconExternalLink" />
-                    </template>
-                    Перейти
-                </NButton>
+                <Link :href="props.href" class="w-full">
+                    <NButton tag="span" class="rounded-none h-10" :block="refreshHidden" :class="refreshHidden ? '' : 'w-[calc(50%+1px)] -ml-px'">
+                        <template #icon>
+                            <NIcon :component="IconExternalLink" />
+                        </template>
+                        Перейти
+                    </NButton>
+                </Link>
             </NFlex>
         </template>
     </NCard>
