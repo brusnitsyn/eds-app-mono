@@ -8,6 +8,7 @@ Route::get('/', function () {
     return Inertia::render('Index', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
+        'staffCount' => \App\Models\Staff::count()
     ]);
 });
 
@@ -26,4 +27,24 @@ Route::middleware([
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
+
+    Route::prefix('admin')->group(function () {
+        Route::get('/', function () {
+            return Inertia::render('Admin/Index', [
+                'userCount' => \App\Models\User::count(),
+                'roleCount' => \App\Models\Role::count(),
+            ]);
+        })->name('admin.index');
+
+        Route::get('/users', function () {
+            return Inertia::render('Admin/Users/Index', [
+                'usersCount' => \App\Models\User::count(),
+            ]);
+        })->name('admin.users');
+        Route::get('/roles', function () {
+            return Inertia::render('Admin/Roles/Index', [
+                'roles' => \App\Models\Role::all(),
+            ]);
+        })->name('admin.roles');
+    });
 });
