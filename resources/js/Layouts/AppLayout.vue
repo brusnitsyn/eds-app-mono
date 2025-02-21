@@ -155,7 +155,7 @@ const logout = () => {
                         <Link href="/" class="flex items-center gap-x-4">
                             <NImage src="/assets/svg/logo-short.svg" preview-disabled width="32" height="32" class="h-8 w-8" />
                             <span class="text-lg">
-                                УЦОД
+                                ЭРСП
                             </span>
                         </Link>
                         <NSpace class="-m-5 -mr-[24px]" :size="0">
