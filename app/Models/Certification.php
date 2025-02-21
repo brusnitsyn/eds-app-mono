@@ -23,7 +23,7 @@ class Certification extends Model
 
     public function staff(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
-        return $this->hasOne(Staff::class);
+        return $this->hasOne(Staff::class, 'id', 'staff_id');
     }
 
     public function actual()

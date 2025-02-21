@@ -17,13 +17,6 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UserSeeder::class,
             DivisionSeeder::class,
-            JournalSeeder::class,
         ]);
-        // User::factory(10)->withPersonalTeam()->create();
-
-//        User::factory()->withPersonalTeam()->create([
-//            'name' => 'Test User',
-//            'email' => 'test@example.com',
-//        ]);
     }
 }

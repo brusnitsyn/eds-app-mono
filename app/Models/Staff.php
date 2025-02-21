@@ -45,17 +45,23 @@ class Staff extends Model
         return $models->load('certification');
     }
 
+    /**
+     * Переопределение имени индекса модели по умолчанию
+     */
+    public function searchableAs(): string
+    {
+        return 'eds_app_staff';
+    }
+
     public function toSearchableArray(): array
     {
         return [
-            'id' => (int) $this->id,
+            'id' => (string) $this->id,
             'full_name' => $this->full_name,
             'job_title' => $this->job_title,
             'inn' => $this->inn,
             'snils' => $this->snils,
-            'is_valid' => (int) $this->certification->is_valid,
-            'is_request_new' => (int) $this->certification->is_request_new,
-            'cert_updated_at' => $this->certification->updated_at,
+            'created_at' => (int) $this->created_at->timestamp,
         ];
     }
 }

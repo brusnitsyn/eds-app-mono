@@ -35,7 +35,9 @@ class StaffController extends Controller
         // Если фильтр не пуст
         if ($searchWhereParams->isNotEmpty()) {
             $searchWhereParams = $searchWhereParams->toArray();
-            $query = $query->where($searchWhereParams[0], $searchWhereParams[1]);
+            $query = $query->whereHas('certification', function ($query) use ($searchWhereParams) {
+                $query->where($searchWhereParams[0], $searchWhereParams[1]);
+            });
         }
 
         $query = $query->get();

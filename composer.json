@@ -17,6 +17,7 @@
         "laravel/tinker": "^2.9",
         "meilisearch/meilisearch-php": "^1.12",
         "nelexa/zip": "^4.0",
+        "predis/predis": "^2.3",
         "tightenco/ziggy": "^2.0",
         "typesense/typesense-php": "^4.9"
     },

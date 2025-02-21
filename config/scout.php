@@ -42,10 +42,7 @@ return [
     |
     */
 
-    'queue' => [
-        'connection' => 'redis',
-        'queue' => 'scout'
-    ], // env('SCOUT_QUEUE', false),
+    'queue' => false,
 
     /*
     |--------------------------------------------------------------------------
@@ -193,10 +190,18 @@ return [
                      'fields' => [
                          [
                              'name' => 'id',
-                             'type' => 'int64',
+                             'type' => 'string',
                          ],
                          [
                              'name' => 'full_name',
+                             'type' => 'string',
+                         ],
+                         [
+                             'name' => 'inn',
+                             'type' => 'string',
+                         ],
+                         [
+                             'name' => 'snils',
                              'type' => 'string',
                          ],
                          [

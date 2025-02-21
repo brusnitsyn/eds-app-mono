@@ -29,12 +29,6 @@ class CreateNewStaff
         $data['gender'] = 'slava';
 
         $staff = Staff::updateOrCreate(['snils' => $data['snils']], $data);
-
-//        if ($staff->certification->exist()) {
-//
-//            return $staff;
-//        }
-
         $staff->certification()->updateOrCreate($certification);
 
         return $staff;
