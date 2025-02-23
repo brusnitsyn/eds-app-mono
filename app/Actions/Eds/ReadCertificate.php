@@ -25,6 +25,21 @@ class ReadCertificate
 
     public function read(string $pathToCertificate)
     {
+        $certificateDir = pathinfo($pathToCertificate, PATHINFO_DIRNAME);
+        $closeKeyFolder = glob($certificateDir . '/*', GLOB_ONLYDIR);
+
+        $closeKeyValidTo = null;
+        if (count($closeKeyFolder) && $closeKeyFolder[0]) {
+            $closeKeyPath = "$closeKeyFolder[0]/header.key";
+            $closeKeyContent = file_get_contents($closeKeyPath);
+            // Регулярное выражение для поиска даты в формате YYYYMMDDHHMMSSZ
+            $pattern = '/\d{14}Z/';
+            if (preg_match($pattern, $closeKeyContent, $matches)) {
+                $dateString = $matches[0];
+                $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
+            }
+        }
+
         $certContents = file_get_contents($pathToCertificate);
 
         $certificateCAPemContent = '-----BEGIN CERTIFICATE-----'.PHP_EOL
@@ -56,8 +71,9 @@ class ReadCertificate
         $result = [
             'certificate' => [
                 'serial_number' => $serialNumber,
-                'valid_from' => Carbon::parse($parsedCert['validFrom_time_t'])->valueOf(),
-                'valid_to' => Carbon::parse($parsedCert['validTo_time_t'])->valueOf(),
+                'valid_from' => Carbon::parse($parsedCert['validFrom_time_t'])->getTimestampMs(),
+                'valid_to' => Carbon::parse($parsedCert['validTo_time_t'])->getTimestampMs(),
+                'close_key_valid_to' => $closeKeyValidTo
             ],
             'job_title' => $job_title,
             'full_name' => $full_name,

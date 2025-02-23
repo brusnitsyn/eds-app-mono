@@ -7,9 +7,17 @@ import {format, toDate} from 'date-fns'
 import {Link, Head, router, usePage, useForm} from "@inertiajs/vue3";
 import {debounce} from "@/Utils/debounce.js";
 import CreateStaffForm from "@/Pages/Staff/Partials/CreateStaffForm.vue";
+import {encode, normalizeURL} from "ufo";
 
-defineProps({
-    staffs: Array
+const props = defineProps({
+    staffs: Array,
+    filterJob: Array
+})
+
+const searchInputRef = ref()
+
+onMounted(() => {
+    searchInputRef.value.focus()
 })
 
 const columns = [
@@ -69,7 +77,10 @@ const columns = [
         sorter: 'default',
         ellipsis: {
             tooltip: true
-        }
+        },
+        filter: true,
+        filterOptionValues: usePage().props.ziggy.query.filters?.job_title,
+        filterOptions: props.filterJob
     },
     // {
     //     title: '',
@@ -100,6 +111,11 @@ const columns = [
     // }
 ]
 
+/// TODO: доделать фильтрацию по должностям
+const handleFiltersChange = (filters) => {
+    const jobTitles = Array.from(filters.job_title)
+    router.get('/staff', { ...router.page.props.ziggy.query, filters: { job_title: jobTitles } }, { preserveState: false })
+}
 const staffType = ref(router.page.props.ziggy.query.valid_type)
 const computedStaffType = computed({
     get() {
@@ -107,7 +123,7 @@ const computedStaffType = computed({
     },
     set(value) {
         staffType.value = value
-        router.get('/staff', { ...router.page.props.ziggy.query, valid_type: value }, { preserveState: true })
+        router.get('/staff', { ...router.page.props.ziggy.query, valid_type: value }, { preserveState: false })
     }
 })
 
@@ -136,7 +152,7 @@ const debounceSearchStaffValue = computed({
 const form = useForm({ valid_type: null, search_field: 'full_name', search_value: null })
 
 function searchStaff() {
-    form.get('/staff', { preserveState: true })
+    form.get('/staff', { preserveState: false })
     // router.get('/staff', { ...router.page.props.ziggy.query, search_field: 'full_name', search_value: searchStaffValue.value }, { preserveState: true })
     // console.log(searchStaffValue.value)
 }
@@ -165,7 +181,7 @@ const hasShowCreateStaffModal = ref(false)
                 </NFlex>
                 <NInputGroup class="max-w-xl">
 <!--                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />-->
-                    <NInput v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="Значение поиска" @keydown.enter.prevent="searchStaff" :loading="form.processing" />
+                    <NInput ref="searchInputRef" v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="Значение поиска" @keydown.enter.prevent="searchStaff" :loading="form.processing" />
                     <NButton :loading="form.processing" size="large" @click="searchStaff">
                         <template #icon>
                             <NIcon :component="IconSearch" />
@@ -188,7 +204,7 @@ const hasShowCreateStaffModal = ref(false)
                 Добавить персону
             </NButton>
         </template>
-        <NDataTable :columns="columns" :data="staffs" class="h-[620px]" flex-height :loading="form.processing" />
+        <NDataTable :columns="columns" :data="staffs" min-height="calc(100vh - 375px)" max-height="calc(100vh - 375px)" :loading="form.processing" @update:filters="handleFiltersChange" />
     </AppLayout>
 
     <NModal v-model:show="hasShowCreateStaffModal" preset="card" class="max-w-2xl" title="Добавить персону" :bordered="false">

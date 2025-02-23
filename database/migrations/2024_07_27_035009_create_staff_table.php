@@ -24,6 +24,8 @@ return new class extends Migration
             $table->timestamp('dob')->nullable();
             $table->string('tel')->nullable();
             $table->foreignIdFor(\App\Models\Division::class);
+            $table->integer('mis_user_id')->nullable();
+            $table->unsignedBigInteger('mis_sync_at')->nullable();
             $table->timestamps();
         });
     }

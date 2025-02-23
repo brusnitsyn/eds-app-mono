@@ -13,11 +13,18 @@ class StaffController extends Controller
 {
     public function index(Request $request)
     {
+        // Получаем фильтры из запроса
+        $filters = $request->input('filters', []);
+
         $searchValue = $request->query('search_value');
         if ($searchValue)
             $query = Staff::search($searchValue);
         else
             $query = Staff::query();
+
+        if (isset($filters['job_title']) && is_array($filters['job_title'])) {
+            $query->whereIn('job_title', $filters['job_title']);
+        }
 
         $validType = $request->query('valid_type');
         $searchWhereParams = collect();
@@ -50,8 +57,16 @@ class StaffController extends Controller
         $query = $query->toQuery();
 
         $staffs = $query->with('certification')->get();
+
+        $filterJob = $staffs->filter(function ($staff) {
+            return [$staff->job_title => $staff->job_title];
+        })->unique('job_title')->map(function ($staff) {
+            return ['label' => $staff->job_title, 'value' => $staff->job_title];
+        })->pluck(null);
+
         return Inertia::render('Staff/Index', [
-            'staffs' => $staffs
+            'staffs' => $staffs,
+            'filterJob' => $filterJob,
         ]);
     }
 

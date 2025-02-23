@@ -16,7 +16,7 @@ import {
     useThemeVars
 } from "naive-ui";
 import {format, toDate} from "date-fns";
-import {IconAlertCircleFilled, IconChevronLeft, IconDatabaseImport, IconProgressCheck} from "@tabler/icons-vue";
+import {IconAlertCircleFilled, IconCloudUp, IconDatabaseImport, IconProgressCheck, IconDownload} from "@tabler/icons-vue";
 import AppCopyButton from "@/Components/AppCopyButton.vue";
 const props = defineProps({
     staff: Object
@@ -58,9 +58,26 @@ const props = defineProps({
 <!--                        </template>-->
 <!--                    </NCard>-->
 
-<!--                    <NAlert v-if="hasAlerValid" title="Сертификат действителен" type="success" />-->
-<!--                    <NAlert v-if="hasAlerNewRequest" title="Срок действия сертификата подходит к концу" type="warning" />-->
-<!--                    <NAlert v-if="hasAlerNoValid" title="Сертификат не действителен" type="error" />-->
+                    <NGrid cols="2" x-gap="12">
+                        <NGi>
+                            <NAlert v-if="staff.certification.is_valid" title="Сертификат действителен" type="success" />
+                            <NAlert v-else-if="staff.certification.is_valid && staff.certification.is_request_new" title="Срок действия сертификата подходит к концу" type="warning" />
+                            <NAlert v-else title="Сертификат не действителен" type="error" />
+                        </NGi>
+                        <NGi>
+                            <NAlert v-if="staff.certification.close_key_is_valid" title="Закрытый ключ действителен" type="success" />
+                            <NAlert v-else title="Закрытый ключ не действителен" type="error" />
+                        </NGi>
+                    </NGrid>
+
+                    <NSpace>
+                        <NTag v-if="staff.mis_user_id !== null" type="info">
+                            ТМ:МИС {{ format(new Date(staff.mis_sync_at), 'dd.MM.yyyy') }} в {{ format(new Date(staff.mis_sync_at), 'HH:mm') }}
+                            <template #icon>
+                                <NIcon :component="IconProgressCheck" :size="20" />
+                            </template>
+                        </NTag>
+                    </NSpace>
 
                     <NCard title="Общая информация">
                         <!--          <template #header-extra> -->
@@ -113,20 +130,29 @@ const props = defineProps({
 
                     <NCard title="Сведения о сертификате">
                         <template #header-extra>
-                            <NSpace>
-                                <NButton text >
-                                    <template #icon>
-                                        <IconFileZip />
+                            <NButtonGroup>
+
+                                <NTooltip>
+                                    <template #trigger>
+                                        <NButton quaternary>
+                                            <template #icon>
+                                                <IconDownload />
+                                            </template>
+                                        </NButton>
                                     </template>
-                                    Скачать
-                                </NButton>
-                                <NButton v-if="staff.certification.has_mis_identical === false && staff.mis_user_id != null" text >
-                                    <template #icon>
-                                        <NIcon :component="IconDatabaseImport" />
+                                    Скачать сертификат
+                                </NTooltip>
+                                <NTooltip v-if="staff.certification.has_mis_identical === false && staff.mis_user_id != null">
+                                    <template #trigger>
+                                        <NButton quaternary>
+                                            <template #icon>
+                                                <NIcon :component="IconCloudUp" />
+                                            </template>
+                                        </NButton>
                                     </template>
                                     Установить в ТМ:МИС
-                                </NButton>
-                            </NSpace>
+                                </NTooltip>
+                            </NButtonGroup>
                         </template>
                         <NList hoverable>
                             <NListItem>
@@ -154,28 +180,20 @@ const props = defineProps({
                             <NListItem>
                                 <NGrid :cols="2">
                                     <NGi><NText>Действителен с</NText></NGi>
-                                    <NGi><NText>{{ format(toDate(Number(staff.certification.valid_from)), 'dd.MM.yyyy') }}</NText></NGi>
+                                    <NGi><NTime :time="staff.certification.valid_from" format="dd.MM.yyyy HH:MM" /></NGi>
                                 </NGrid>
                             </NListItem>
                             <NListItem>
                                 <NGrid :cols="2">
                                     <NGi><NText>Действителен по</NText></NGi>
-                                    <NGi><NText>{{ format(toDate(Number(staff.certification.valid_to)), 'dd.MM.yyyy') }}</NText></NGi>
+                                    <NGi><NTime :time="staff.certification.valid_to" format="dd.MM.yyyy HH:MM" /></NGi>
                                 </NGrid>
                             </NListItem>
                             <NListItem>
                                 <NGrid :cols="2">
-                                    <NGi><NText>Срок действия закрытого ключа</NText></NGi>
+                                    <NGi><NText>Закрытый ключ по</NText></NGi>
                                     <NGi>
-                                        <NText class="blur select-none">
-                                            00.00.0000
-                                        </NText>
-
-                                        <NTag round :bordered="false" class="ml-4">
-                                            <div class="!text-sm">
-                                                Совсем скоро
-                                            </div>
-                                        </NTag>
+                                        <NTime :time="staff.certification.close_key_valid_to" format="dd.MM.yyyy HH:MM" />
                                     </NGi>
                                 </NGrid>
                             </NListItem>

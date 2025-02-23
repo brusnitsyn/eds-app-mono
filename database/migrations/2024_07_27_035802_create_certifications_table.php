@@ -14,12 +14,14 @@ return new class extends Migration
         Schema::create('certifications', function (Blueprint $table) {
             $table->id();
             $table->string('serial_number');
-            $table->string('valid_from');
-            $table->string('valid_to');
+            $table->unsignedBigInteger('valid_from');
+            $table->unsignedBigInteger('valid_to');
             $table->boolean('is_valid')->default(false);
             $table->boolean('is_request_new')->default(false);
             $table->string('path_certification')->nullable();
             $table->string('file_certification')->nullable();
+            $table->unsignedBigInteger('close_key_valid_to')->nullable(); // Закрытый ключ до
+            $table->boolean('close_key_is_valid')->default(false); // Актуальный ли ключ
             $table->foreignIdFor(\App\Models\Staff::class);
             $table->timestamps();
         });
