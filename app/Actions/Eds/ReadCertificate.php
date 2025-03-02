@@ -7,6 +7,7 @@ use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpZip\ZipFile;
@@ -29,16 +30,40 @@ class ReadCertificate
         $closeKeyFolder = glob($certificateDir . '/*', GLOB_ONLYDIR);
 
         $closeKeyValidTo = null;
-        if (count($closeKeyFolder) && $closeKeyFolder[0]) {
-            $closeKeyPath = "$closeKeyFolder[0]/header.key";
-            $closeKeyContent = file_get_contents($closeKeyPath);
-            // Регулярное выражение для поиска даты в формате YYYYMMDDHHMMSSZ
-            $pattern = '/\d{14}Z/';
-            if (preg_match($pattern, $closeKeyContent, $matches)) {
-                $dateString = $matches[0];
-                $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
+        if (count($closeKeyFolder) > 0) {
+            foreach ($closeKeyFolder as $key => $folder) {
+                $folders = scandir($folder);
+                $folders = array_filter($folders, function ($name) {
+                    return $name === 'header.key';
+                });
+                if ($folders) {
+                    $closeKeyPath = "$closeKeyFolder[$key]/header.key";
+                    try {
+                        $closeKeyContent = file_get_contents($closeKeyPath);
+                    } catch (\Exception $e) {
+                        Log::error("Ошибка в файле");
+                        Log::error($folders);
+                        Log::error($e->getMessage());
+                    }
+                    // Регулярное выражение для поиска даты в формате YYYYMMDDHHMMSSZ
+                    $pattern = '/\d{14}Z/';
+                    if (preg_match($pattern, $closeKeyContent, $matches)) {
+                        $dateString = $matches[0];
+                        $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
+                    }
+                }
             }
         }
+//        if (count($closeKeyFolder) && $closeKeyFolder[0]) {
+//            $closeKeyPath = "$closeKeyFolder[0]/header.key";
+//            $closeKeyContent = file_get_contents($closeKeyPath);
+//            // Регулярное выражение для поиска даты в формате YYYYMMDDHHMMSSZ
+//            $pattern = '/\d{14}Z/';
+//            if (preg_match($pattern, $closeKeyContent, $matches)) {
+//                $dateString = $matches[0];
+//                $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
+//            }
+//        }
 
         $certContents = file_get_contents($pathToCertificate);
 
@@ -118,9 +143,12 @@ class ReadCertificate
         foreach ($certificateFiles as $file) {
             if (pathinfo($file, PATHINFO_EXTENSION) == "cer") {
                 $certificateDirectory = pathinfo($file, PATHINFO_DIRNAME);
+                Log::debug($certificateDirectory);
                 $certificateFile = pathinfo($file, PATHINFO_FILENAME) . '/' . pathinfo($file, PATHINFO_BASENAME);
+                Log::debug($certificateFile);
             }
         }
+
 
         $certificationInfo = $this->read(Storage::disk('certification')->path($certificateFile));
 
@@ -159,6 +187,8 @@ class ReadCertificate
                 }
             }
 
+            Log::debug("Наименование сертификата: $cerFileName");
+
             if (!$cerFileName) {
                 // TODO: Обработать ошибку, если нет открытого ключа
             }
@@ -172,13 +202,19 @@ class ReadCertificate
             }
 
             $certificateFiles = Storage::disk('certification')->files($cerFileName);
+            Log::debug("Файлы сертификата");
+            Log::debug($certificateFiles);
+            Log::debug("Файлы распакованные");
+            Log::debug($extractedFiles);
             $certificateFile = null;
             $certificateDirectory = null;
             foreach ($certificateFiles as $file) {
                 if (pathinfo($file, PATHINFO_EXTENSION) == "cer") {
                     $certificateDirectory = pathinfo($file, PATHINFO_DIRNAME);
                     $certificateFile = pathinfo($file, PATHINFO_FILENAME) . '/' . pathinfo($file, PATHINFO_BASENAME);
+                    Log::debug(1);
                 }
+                Log::debug($file);
             }
 
             $certificationInfo = $this->read(Storage::disk('certification')->path($certificateFile));
