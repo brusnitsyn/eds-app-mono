@@ -3,6 +3,7 @@
 namespace App\Actions\Eds;
 
 use App\Facades\Crypto;
+use App\Models\Staff;
 use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -112,7 +113,13 @@ class ReadCertificate
             . '-----END CERTIFICATE-----' . PHP_EOL;
 
         $parsedCert = openssl_x509_parse($certificateCAPemContent);
+        $validToTimestamp = Carbon::parse($parsedCert['validTo_time_t'])->getTimestampMs();
         $snils = $parsedCert['subject']['SNILS']; // Получаем СНИЛС пользователя из сертификата
+
+        $staff = Staff::whereSnils($snils)->first();
+        if ($staff && $staff->certification->valid_to > $validToTimestamp) {
+            return; // Пропускаем пакет, так как сертификат устаревший
+        }
 
         // Короткое имя папки
         $folderName = hash('md5', $snils);
@@ -175,7 +182,13 @@ class ReadCertificate
                 . '-----END CERTIFICATE-----' . PHP_EOL;
 
             $parsedCert = openssl_x509_parse($certificateCAPemContent);
+            $validToTimestamp = Carbon::parse($parsedCert['validTo_time_t'])->getTimestampMs();
             $snils = $parsedCert['subject']['SNILS']; // Получаем СНИЛС пользователя из сертификата
+
+            $staff = Staff::whereSnils($snils)->first();
+            if ($staff && $staff->certification->valid_to > $validToTimestamp) {
+                continue; // Пропускаем пакет, так как сертификат устаревший
+            }
 
             // Короткое имя папки
             $folderName = hash('md5', $snils);
