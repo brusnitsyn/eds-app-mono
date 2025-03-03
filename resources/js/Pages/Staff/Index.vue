@@ -2,7 +2,7 @@
 import AppLayout from "@/Layouts/AppLayout.vue"
 import {NDataTable, NText, NButton, NIcon, NSpace, NFlex, NRadioGroup, NRadioButton, NInputGroup, NSelect, NInput, NModal} from 'naive-ui'
 import {computed, h, ref} from "vue"
-import {IconSquareRoundedPlus, IconFileSpreadsheet, IconSearch} from '@tabler/icons-vue'
+import {IconSquareRoundedPlus, IconFileSpreadsheet, IconSearch, IconFileZip} from '@tabler/icons-vue'
 import {format, toDate} from 'date-fns'
 import {Link, Head, router, usePage, useForm} from "@inertiajs/vue3";
 import {debounce} from "@/Utils/debounce.js";
@@ -15,6 +15,7 @@ const props = defineProps({
 })
 
 const searchInputRef = ref()
+const checkedRowKeys = ref([])
 
 onMounted(() => {
     searchInputRef.value.focus()
@@ -32,7 +33,10 @@ const columns = [
     {
         title: 'ФИО',
         key: 'full_name',
-        width: 280,
+        width: 340,
+        ellipsis: {
+            tooltip: true
+        },
         sorter: 'default',
         sortOrder: false,
         render(row) {
@@ -134,6 +138,20 @@ const selectSearchStaffOptions = [
     }
 ]
 
+const paginationReactive = reactive({
+    page: props.staffs.current_page,
+    pageSize: props.staffs.per_page,
+    pageCount: props.staffs.last_page,
+    showSizePicker: true,
+    pageSizes: [25, 50, 100],
+    onChange: (page) => {
+        router.get('/staff', { ...router.page.props.ziggy.query, page }, { preserveState: false })
+    },
+    onUpdatePageSize: (pageSize) => {
+        router.get('/staff', { ...router.page.props.ziggy.query, page: 1, page_size: pageSize }, { preserveState: false })
+    }
+})
+
 const selectedSearchStaffOption = ref(selectSearchStaffOptions[0].value)
 
 const searchStaffValue = ref(router.page.props.ziggy.query.search_value)
@@ -158,6 +176,14 @@ function searchStaff() {
 }
 
 const hasShowCreateStaffModal = ref(false)
+
+const handleCheck = (rowKeys) => {
+    checkedRowKeys.value = rowKeys
+}
+
+const onDownloadUrl = computed(() => route('certification.download', {
+    staff_ids: checkedRowKeys.value,
+}, true))
 </script>
 
 <template>
@@ -172,12 +198,12 @@ const hasShowCreateStaffModal = ref(false)
                         <NRadioButton label="Недействительные" value="no-valid" />
                     </NRadioGroup>
 
-<!--                    <NButton v-if="checkedRows.length" secondary :disabled="status === 'pending'" @click="downloadCert">-->
-<!--                        <template #icon>-->
-<!--                            <IconFileZip />-->
-<!--                        </template>-->
-<!--                        Скачать-->
-<!--                    </NButton>-->
+                    <NButton v-if="checkedRowKeys.length" tag="a" target="_blank" secondary :href="onDownloadUrl">
+                        <template #icon>
+                            <NIcon :component="IconFileZip" />
+                        </template>
+                        Скачать
+                    </NButton>
                 </NFlex>
                 <NInputGroup class="max-w-xl">
 <!--                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />-->
@@ -204,7 +230,17 @@ const hasShowCreateStaffModal = ref(false)
                 Добавить персону
             </NButton>
         </template>
-        <NDataTable :columns="columns" :data="staffs" min-height="calc(100vh - 375px)" max-height="calc(100vh - 375px)" :loading="form.processing" @update:filters="handleFiltersChange" />
+        <NDataTable remote
+                    :columns="columns"
+                    :pagination="paginationReactive"
+                    :data="staffs.data"
+                    min-height="calc(100vh - 415px)"
+                    max-height="calc(100vh - 415px)"
+                    :loading="form.processing"
+                    @update:filters="handleFiltersChange"
+                    :row-key="row => row.id"
+                    @update:checked-row-keys="handleCheck"
+        />
     </AppLayout>
 
     <NModal v-model:show="hasShowCreateStaffModal" preset="card" class="max-w-2xl" title="Добавить персону" :bordered="false">

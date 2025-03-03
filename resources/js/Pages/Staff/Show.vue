@@ -18,9 +18,14 @@ import {
 import {format, toDate} from "date-fns";
 import {IconAlertCircleFilled, IconCloudUp, IconDatabaseImport, IconProgressCheck, IconDownload} from "@tabler/icons-vue";
 import AppCopyButton from "@/Components/AppCopyButton.vue";
+import {router} from "@inertiajs/vue3";
 const props = defineProps({
     staff: Object
 })
+
+const onDownloadUrl = computed(() => route('certification.download', {
+    staff_ids: [props.staff.id],
+}, true))
 </script>
 
 <template>
@@ -134,7 +139,7 @@ const props = defineProps({
 
                                 <NTooltip>
                                     <template #trigger>
-                                        <NButton quaternary>
+                                        <NButton tag="a" target="_blank" :href="onDownloadUrl" quaternary>
                                             <template #icon>
                                                 <IconDownload />
                                             </template>
