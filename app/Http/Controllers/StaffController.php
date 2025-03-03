@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Eds\ReadCertificate;
+use App\Facades\Crypto;
 use App\Http\Requests\Staff\CreateStaffRequest;
+use App\Models\Certification;
 use App\Models\Staff;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use PhpZip\ZipFile;
+use ZipArchive;
 
 class StaffController extends Controller
 {
@@ -15,50 +20,37 @@ class StaffController extends Controller
     {
         // Получаем фильтры из запроса
         $filters = $request->input('filters', []);
-
         $searchValue = $request->query('search_value');
-        if ($searchValue)
-            $query = Staff::search($searchValue);
-        else
-            $query = Staff::query();
+        $validType = $request->query('valid_type');
+        $pageSize = $request->query('page_size', 25);
+
+        $query = $searchValue ? Staff::search($searchValue) : Staff::query();
 
         if (isset($filters['job_title']) && is_array($filters['job_title'])) {
             $query->whereIn('job_title', $filters['job_title']);
         }
 
-        $validType = $request->query('valid_type');
-        $searchWhereParams = collect();
-        if (isset($validType)) {
-            switch ($validType) {
-                case 'no-valid':
-                    $searchWhereParams->push('is_valid', 0);
-                    break;
-                case 'new-request':
-                    $searchWhereParams->push('is_request_new', 1);
-                    break;
-            }
-        }
+        $query->with('certification');
 
-        // Если фильтр не пуст
-        if ($searchWhereParams->isNotEmpty()) {
-            $searchWhereParams = $searchWhereParams->toArray();
-            $query = $query->whereHas('certification', function ($query) use ($searchWhereParams) {
-                $query->where($searchWhereParams[0], $searchWhereParams[1]);
+        if (isset($validType)) {
+            $query->whereHas('certification', function ($query) use ($validType) {
+                if ($validType == 'no-valid') {
+                    $query->where('is_valid', false);
+                } else if ($validType == 'new-request') {
+                    $query->where('is_request_new', true);
+                }
             });
         }
 
-        $query = $query->get();
-
-        if ($query->isEmpty()) {
+        if (!$query->exists()) {
             return Inertia::render('Staff/Index', [
                 'staffs' => []
             ]);
         }
-        $query = $query->toQuery();
 
-        $staffs = $query->with('certification')->get();
+        $staffs = $query->paginate($pageSize);
 
-        $filterJob = $staffs->filter(function ($staff) {
+        $filterJob = Staff::all()->filter(function ($staff) {
             return [$staff->job_title => $staff->job_title];
         })->unique('job_title')->map(function ($staff) {
             return ['label' => $staff->job_title, 'value' => $staff->job_title];
@@ -92,5 +84,57 @@ class StaffController extends Controller
         return Inertia::render('Staff/Show', [
             'staff' => $staff
         ]);
+    }
+
+    public function downloadCertificates(Request $request, $staff_ids)
+    {
+        $staffIds = explode(',', $staff_ids);
+        if (empty($staffIds)) {
+            return;
+        }
+
+        $certificateIds = Staff::whereIn('id', $staffIds)
+            ->get()->map(function ($staff) {
+                return [$staff->certification->id];
+            });
+
+        if ($certificateIds->isEmpty()) {
+            return;
+        }
+
+        $certificates = Certification::whereIn('id', $certificateIds)->get();
+
+        if ($certificates->isEmpty()) {
+            return;
+        }
+
+        $zipFileName = 'certificates_' . time() . '.zip';
+        $zipPath = storage_path('app/temp/' . $zipFileName);
+
+        $zip = new ZipFile();
+
+        foreach ($certificates as $certificate) {
+            $filePath = \Storage::disk('certification')->files($certificate->path_certification, true);
+
+            foreach ($filePath as $file) {
+                $filePath = \Storage::disk('certification')->path($file);
+                $fileContent = file_get_contents($filePath);
+                $decrypt = Crypt::decryptString($fileContent);
+
+                if (file_exists($filePath)) {
+                    $fileName = pathinfo($file, PATHINFO_BASENAME);
+                    if (Str::contains(dirname($file), "/"))
+                    {
+                        $fileName = Str::substr(dirname($file), Str::position(dirname($file), "/") + 1) . "/$fileName";
+                    }
+
+                    $zip->addFromString($fileName, $decrypt);
+                }
+            }
+        }
+        $zip->saveAsFile($zipPath);
+        $zip->close();
+
+        return response()->download($zipPath)->deleteFileAfterSend();
     }
 }
