@@ -18,6 +18,7 @@ Route::middleware([
     'verified',
 ])->group(function () {
     Route::resource('staff', \App\Http\Controllers\StaffController::class);
+    Route::get('/certification/download/{staff_ids}', [\App\Http\Controllers\StaffController::class, 'downloadCertificates'])->name('certification.download');
 //    Route::resource('journal', \App\Http\Controllers\JournalController::class);
     Route::get('/journals', function () {
         return Inertia::render('Journals/Index');
