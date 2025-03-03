@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {useForm} from "@inertiajs/vue3";
+import {router, useForm} from "@inertiajs/vue3";
 import {NTabs, NTabPane, NForm, NFormItem, NInput, NUpload, NUploadDragger, NIcon, NText, NCheckbox, NFlex, NSpace, NButton} from 'naive-ui'
 import {IconArchive} from '@tabler/icons-vue'
 
@@ -12,7 +12,10 @@ const emits = defineEmits('success')
 
 function handleUpload() {
     form.post('/staff', {
-        onSuccess: () => emits('success')
+        onSuccess: () => {
+            emits('success')
+            router.reload()
+        }
     });
 }
 </script>
