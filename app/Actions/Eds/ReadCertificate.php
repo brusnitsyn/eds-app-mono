@@ -7,6 +7,7 @@ use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -24,67 +25,46 @@ class ReadCertificate
         }
     }
 
-    public function read(string $pathToCertificate)
+    public function read(string $pathToCertificate): array
     {
         $certificateDir = pathinfo($pathToCertificate, PATHINFO_DIRNAME);
-        $closeKeyFolder = glob($certificateDir . '/*', GLOB_ONLYDIR);
-
         $closeKeyValidTo = null;
-        if (count($closeKeyFolder) > 0) {
-            foreach ($closeKeyFolder as $key => $folder) {
-                $folders = scandir($folder);
-                $folders = array_filter($folders, function ($name) {
-                    return $name === 'header.key';
-                });
-                if ($folders) {
-                    $closeKeyPath = "$closeKeyFolder[$key]/header.key";
-                    try {
-                        $closeKeyContent = file_get_contents($closeKeyPath);
-                    } catch (\Exception $e) {
-                        Log::error("Ошибка в файле");
-                        Log::error($folders);
-                        Log::error($e->getMessage());
-                    }
-                    // Регулярное выражение для поиска даты в формате YYYYMMDDHHMMSSZ
-                    $pattern = '/\d{14}Z/';
-                    if (preg_match($pattern, $closeKeyContent, $matches)) {
-                        $dateString = $matches[0];
-                        $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
-                    }
+
+        // Поиск всех header.key файлов
+        $closeKeyFiles = glob($certificateDir . '/*/header.key');
+        foreach ($closeKeyFiles as $closeKeyFile) {
+            try {
+                $closeKeyContent = file_get_contents($closeKeyFile);
+                $pattern = '/\d{14}Z/';
+                if (preg_match($pattern, $closeKeyContent, $matches)) {
+                    $dateString = $matches[0];
+                    $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
+                    break; // Если нашли дату, выходим из цикла
                 }
+            } catch (\Exception $e) {
+                Log::error("Ошибка при чтении файла: $closeKeyFile", ['error' => $e->getMessage()]);
             }
         }
-//        if (count($closeKeyFolder) && $closeKeyFolder[0]) {
-//            $closeKeyPath = "$closeKeyFolder[0]/header.key";
-//            $closeKeyContent = file_get_contents($closeKeyPath);
-//            // Регулярное выражение для поиска даты в формате YYYYMMDDHHMMSSZ
-//            $pattern = '/\d{14}Z/';
-//            if (preg_match($pattern, $closeKeyContent, $matches)) {
-//                $dateString = $matches[0];
-//                $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
-//            }
-//        }
 
         $certContents = file_get_contents($pathToCertificate);
-
-        $certificateCAPemContent = '-----BEGIN CERTIFICATE-----'.PHP_EOL
-            .chunk_split(base64_encode($certContents), 64, PHP_EOL)
-            .'-----END CERTIFICATE-----'.PHP_EOL;
+        $certificateCAPemContent = '-----BEGIN CERTIFICATE-----' . PHP_EOL
+            . chunk_split(base64_encode($certContents), 64, PHP_EOL)
+            . '-----END CERTIFICATE-----' . PHP_EOL;
 
         $parsedCert = openssl_x509_parse($certificateCAPemContent);
 
         $serialNumber = $parsedCert['serialNumber'];
-
-        if(intval($serialNumber)) {
+        if (intval($serialNumber)) {
             $serialNumber = strtoupper($this->bcdechex($parsedCert['serialNumber']));
             if (strlen($serialNumber) % 2 !== 0) {
                 $serialNumber = '0' . $serialNumber;
             }
         }
-        if(Str::contains($serialNumber, '0x')) $serialNumber = Str::replace('0x', '00', $serialNumber);
+        if (Str::contains($serialNumber, '0x')) {
+            $serialNumber = Str::replace('0x', '00', $serialNumber);
+        }
 
         $parsedSubject = $parsedCert['subject'];
-
         $full_name = $parsedSubject['CN'];
         $explodeFullName = Str::of($full_name)->explode(' ');
         $first_name = $explodeFullName[1];
@@ -93,7 +73,7 @@ class ReadCertificate
 
         $job_title = Str::ucfirst(Str::lower($parsedSubject['title'] ?? ''));
 
-        $result = [
+        return [
             'certificate' => [
                 'serial_number' => $serialNumber,
                 'valid_from' => Carbon::parse($parsedCert['validFrom_time_t'])->getTimestampMs(),
@@ -108,168 +88,177 @@ class ReadCertificate
             'snils' => $parsedSubject['SNILS'],
             'inn' => $parsedSubject['INN']
         ];
-
-        return $result;
     }
 
-    public function readSingle(UploadedFile|File $archiveFile)
+    public function readSingle(UploadedFile|File $archiveFile): void
     {
+        // Извлекаем архив во временную директорию
         $extractedCertificatePath = $this->extractToTemp($archiveFile);
-        $extractedFiles = Storage::disk('temp')->files($extractedCertificatePath);
+        $extractedFiles = Storage::disk('temp')->allFiles($extractedCertificatePath);
 
-        $cerFileName = null;
-
-        foreach ($extractedFiles as $extractedFile) {
-            if (pathinfo($extractedFile, PATHINFO_EXTENSION) == "cer") {
-                $cerFileName = pathinfo($extractedFile, PATHINFO_FILENAME);
-            }
-        }
-
-        if (!$cerFileName) {
-            // TODO: Обработать ошибку, если нет открытого ключа
-        }
-
-        foreach ($extractedFiles as $extractedFile) {
-            if (Storage::disk('certification')->exists($cerFileName))
-                Storage::disk('certification')->deleteDirectory($cerFileName);
-
-            $extractedDirectory = pathinfo($extractedFile, PATHINFO_DIRNAME);
-            $this->moveToStorage("$extractedDirectory", "$cerFileName");
-        }
-
-        $certificateFiles = Storage::disk('certification')->files($cerFileName);
-        $certificateFile = null;
-        $certificateDirectory = null;
-        foreach ($certificateFiles as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) == "cer") {
-                $certificateDirectory = pathinfo($file, PATHINFO_DIRNAME);
-                Log::debug($certificateDirectory);
-                $certificateFile = pathinfo($file, PATHINFO_FILENAME) . '/' . pathinfo($file, PATHINFO_BASENAME);
-                Log::debug($certificateFile);
-            }
-        }
-
-
-        $certificationInfo = $this->read(Storage::disk('certification')->path($certificateFile));
-
-        $certificationInfo['certificate']['path_certification'] = $certificateDirectory;
-        $certificationInfo['certificate']['file_certification'] = $certificateFile;
-
-        $createdStaff = new CreateNewStaff();
-        $createdStaff->create($certificationInfo);
-
-        Storage::disk('temp')->deleteDirectory($extractedCertificatePath);
-
-        $certificateFiles = collect(Storage::disk('certification')->files($cerFileName, true));
-        $certificateFiles = $certificateFiles->map(function ($path) {
-            return Storage::disk('certification')->path($path);
+        // Ищем файл сертификата (.cer)
+        $cerFile = collect($extractedFiles)->first(function ($file) {
+            return pathinfo($file, PATHINFO_EXTENSION) === 'cer';
         });
-        $certificateFiles = $certificateFiles->all();
 
-        foreach ($certificateFiles as $file) {
-            Crypto::encryptFile($file);
+        if (!$cerFile) {
+            throw new \Exception('Не найден файл сертификата (.cer)');
         }
+
+        // Читаем информацию из сертификата
+        $certContents = file_get_contents(Storage::disk('temp')->path($cerFile));
+        $certificateCAPemContent = '-----BEGIN CERTIFICATE-----' . PHP_EOL
+            . chunk_split(base64_encode($certContents), 64, PHP_EOL)
+            . '-----END CERTIFICATE-----' . PHP_EOL;
+
+        $parsedCert = openssl_x509_parse($certificateCAPemContent);
+        $snils = $parsedCert['subject']['SNILS']; // Получаем СНИЛС пользователя из сертификата
+
+        // Короткое имя папки
+        $folderName = hash('md5', $snils);
+
+        // Создаем папку с именем пользователя
+        $destinationPath = "$folderName";
+        $this->moveDirectoryToStorage($extractedCertificatePath, $destinationPath);
+
+        // Получаем путь к файлу сертификата в постоянном хранилище
+        $certificateFile = Storage::disk('certification')->path("$destinationPath/" . basename($cerFile));
+
+        // Читаем информацию из сертификата
+        $certificationInfo = $this->read($certificateFile);
+
+        // Добавляем путь к сертификату и ключам в результат
+        $certificationInfo['certificate']['path_certification'] = $destinationPath;
+        $certificationInfo['certificate']['file_certification'] = basename($cerFile);
+
+        // Сохраняем информацию в базу данных
+        DB::transaction(function () use ($certificationInfo) {
+            $createdStaff = new CreateNewStaff();
+            $createdStaff->create($certificationInfo);
+        });
+
+        // Шифруем все файлы в папке
+        $this->encryptFilesInDirectory($destinationPath);
+
+        // Удаляем временные файлы
+        Storage::disk('temp')->deleteDirectory($extractedCertificatePath);
     }
 
-    public function readMany(UploadedFile|File $archiveFile)
+    public function readMany(UploadedFile|File $archiveFile): void
     {
+        // Извлекаем все архивы во временную директорию
         $extractedTempPackagesPath = $this->extractToTemp($archiveFile);
         $extractedTempPackages = Storage::disk('temp')->files($extractedTempPackagesPath);
 
+        // Обрабатываем каждый пакет
         foreach ($extractedTempPackages as $package) {
+            Log::debug("Начато чтение пакета: $package");
+
+            // Извлекаем содержимое текущего пакета
             $extractedCertificatePath = $this->extractToTemp(storage_path("/app/temp/$package"));
-            $extractedFiles = Storage::disk('temp')->files($extractedCertificatePath);
-            $cerFileName = null;
+            $extractedFiles = Storage::disk('temp')->allFiles($extractedCertificatePath);
 
-            foreach ($extractedFiles as $extractedFile) {
-                if (pathinfo($extractedFile, PATHINFO_EXTENSION) == "cer") {
-                    $cerFileName = pathinfo($extractedFile, PATHINFO_FILENAME);
-                }
+            // Ищем файл сертификата (.cer)
+            $cerFile = collect($extractedFiles)->first(function ($file) {
+                return pathinfo($file, PATHINFO_EXTENSION) === 'cer';
+            });
+
+            if (!$cerFile) {
+                Log::error("Не найден файл сертификата (.cer) в пакете: $package");
+                continue; // Пропускаем пакет, если нет сертификата
             }
 
-            Log::debug("Наименование сертификата: $cerFileName");
+            // Читаем информацию из сертификата
+            $certContents = file_get_contents(Storage::disk('temp')->path($cerFile));
+            $certificateCAPemContent = '-----BEGIN CERTIFICATE-----' . PHP_EOL
+                . chunk_split(base64_encode($certContents), 64, PHP_EOL)
+                . '-----END CERTIFICATE-----' . PHP_EOL;
 
-            if (!$cerFileName) {
-                // TODO: Обработать ошибку, если нет открытого ключа
-            }
+            $parsedCert = openssl_x509_parse($certificateCAPemContent);
+            $snils = $parsedCert['subject']['SNILS']; // Получаем СНИЛС пользователя из сертификата
 
-            foreach ($extractedFiles as $extractedFile) {
-                if (Storage::disk('certification')->exists($cerFileName))
-                    Storage::disk('certification')->deleteDirectory($cerFileName);
+            // Короткое имя папки
+            $folderName = hash('md5', $snils);
 
-                $extractedDirectory = pathinfo($extractedFile, PATHINFO_DIRNAME);
-                $this->moveToStorage("$extractedDirectory", "$cerFileName");
-            }
+            // Создаем папку с именем пользователя
+            $destinationPath = "$folderName";
+            $this->moveDirectoryToStorage($extractedCertificatePath, $destinationPath);
 
-            $certificateFiles = Storage::disk('certification')->files($cerFileName);
-            Log::debug("Файлы сертификата");
-            Log::debug($certificateFiles);
-            Log::debug("Файлы распакованные");
-            Log::debug($extractedFiles);
-            $certificateFile = null;
-            $certificateDirectory = null;
-            foreach ($certificateFiles as $file) {
-                if (pathinfo($file, PATHINFO_EXTENSION) == "cer") {
-                    $certificateDirectory = pathinfo($file, PATHINFO_DIRNAME);
-                    $certificateFile = pathinfo($file, PATHINFO_FILENAME) . '/' . pathinfo($file, PATHINFO_BASENAME);
-                    Log::debug(1);
-                }
-                Log::debug($file);
-            }
+            // Получаем путь к файлу сертификата в постоянном хранилище
+            $certificateFile = Storage::disk('certification')->path("$destinationPath/" . basename($cerFile));
 
-            $certificationInfo = $this->read(Storage::disk('certification')->path($certificateFile));
+            // Читаем информацию из сертификата
+            $certificationInfo = $this->read($certificateFile);
 
-            $certificationInfo['certificate']['path_certification'] = $certificateDirectory;
-            $certificationInfo['certificate']['file_certification'] = $certificateFile;
+            // Добавляем путь к сертификату и ключам в результат
+            $certificationInfo['certificate']['path_certification'] = $destinationPath;
+            $certificationInfo['certificate']['file_certification'] = basename($cerFile);
 
-            $createdStaff = new CreateNewStaff();
-            $createdStaff->create($certificationInfo);
+            // Сохраняем информацию в базу данных
+            DB::transaction(function () use ($certificationInfo) {
+                $createdStaff = new CreateNewStaff();
+                $createdStaff->create($certificationInfo);
+            });
+
+            // Шифруем все файлы в папке
+            $this->encryptFilesInDirectory($destinationPath);
         }
 
+        // Удаляем временные файлы
         Storage::disk('temp')->deleteDirectory($extractedTempPackagesPath);
     }
 
-    private function extractToTemp(File|string $archiveFile)
+    private function extractToTemp(File|string $archiveFile): string
     {
-        $pathInfo = pathinfo($archiveFile);
-        $hashPath = hash('md5', $pathInfo['basename']);
+        $hashPath = hash('md5', basename($archiveFile));
         $tempPath = storage_path("/app/temp/$hashPath");
-        $zipTool = new ZipFile();
-        $zipTool->openFile($archiveFile);
 
         if (Storage::disk('temp')->exists($hashPath)) {
             Storage::disk('temp')->deleteDirectory($hashPath);
-            Storage::disk('temp')->makeDirectory($hashPath);
-        } else {
-            Storage::disk('temp')->makeDirectory($hashPath);
         }
+        Storage::disk('temp')->makeDirectory($hashPath);
 
+        $zipTool = new ZipFile();
+        $zipTool->openFile($archiveFile);
         $zipTool->extractTo($tempPath);
         $zipTool->close();
 
         return $hashPath;
     }
 
-    private function extractToStorage(string $path)
+    private function moveDirectoryToStorage(string $sourcePath, string $destinationPath): void
     {
-        $pathInfo = pathinfo($path);
-        $baseName = $pathInfo['basename'];
-        if (Storage::disk('certification')->exists($baseName)) {
-            Storage::disk('certification')->deleteDirectory($baseName);
+        // Удаляем старую папку, если она существует
+        if (Storage::disk('certification')->exists($destinationPath)) {
+            Storage::disk('certification')->deleteDirectory($destinationPath);
         }
 
-        Storage::disk('certification')->makeDirectory($baseName);
+        // Создаем новую папку
+        Storage::disk('certification')->makeDirectory($destinationPath);
 
-        $zipTool = new ZipFile();
-        $zipTool->openFile($path);
-        $zipTool->extractTo(storage_path("/app/certification/$baseName"));
-        $zipTool->close();
+        // Перемещаем все файлы и подпапки
+        $files = Storage::disk('temp')->allFiles($sourcePath);
+        foreach ($files as $file) {
+            // Убираем лишнюю часть пути (например, "temp/")
+            $relativePath = str_replace($sourcePath . '/', '', $file);
+            $destinationFile = "$destinationPath/$relativePath";
 
-        return $baseName;
+            // Создаем подпапки, если они есть
+            $destinationDir = dirname($destinationFile);
+            if (!Storage::disk('certification')->exists($destinationDir)) {
+                Storage::disk('certification')->makeDirectory($destinationDir);
+            }
+
+            // Перемещаем файл
+            Storage::disk('certification')->put($destinationFile, Storage::disk('temp')->get($file));
+        }
     }
 
-    private function moveToStorage(string $path, string $newPath)
+    private function encryptFilesInDirectory(string $directory)
     {
-        \Illuminate\Support\Facades\File::moveDirectory(storage_path("/app/temp/$path"), storage_path("/app/certifications/$newPath"));
+        $files = Storage::disk('certification')->allFiles($directory);
+        foreach ($files as $file) {
+            Crypto::encryptFile(Storage::disk('certification')->path($file));
+        }
     }
 }
