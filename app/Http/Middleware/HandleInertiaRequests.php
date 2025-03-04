@@ -4,7 +4,9 @@ namespace App\Http\Middleware;
 
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Middleware;
+use Laravel\Jetstream\Jetstream;
 use Tighten\Ziggy\Ziggy;
 
 class HandleInertiaRequests extends Middleware
@@ -31,6 +33,9 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $newspaperFile = Jetstream::localizedMarkdownPath('newspaper.md');
+        $text = Str::markdown(file_get_contents($newspaperFile));
+
         return [
             ...parent::share($request),
             'auth' => [
@@ -41,6 +46,7 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
                 'query' => $request->query(),
             ],
+            'newspaper' => $text
         ];
     }
 }

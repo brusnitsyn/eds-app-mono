@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Certification;
+use App\Models\Staff;
+use App\Observers\CertificationObserver;
+use App\Observers\StaffObserver;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\ServiceProvider;
@@ -23,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         JsonResource::withoutWrapping();
+        Staff::observe(StaffObserver::class);
+        Certification::observe(CertificationObserver::class);
     }
 
     private function autoBindFacades(): void

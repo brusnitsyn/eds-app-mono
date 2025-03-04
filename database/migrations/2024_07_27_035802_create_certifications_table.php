@@ -23,6 +23,12 @@ return new class extends Migration
             $table->unsignedBigInteger('close_key_valid_to')->nullable(); // Закрытый ключ до
             $table->boolean('close_key_is_valid')->default(false); // Актуальный ли ключ
             $table->foreignIdFor(\App\Models\Staff::class);
+
+            $table->string('mis_serial_number')->nullable();
+            $table->unsignedBigInteger('mis_valid_from')->nullable();
+            $table->unsignedBigInteger('mis_valid_to')->nullable();
+            $table->boolean('mis_is_identical')->default(false);
+
             $table->timestamps();
         });
     }

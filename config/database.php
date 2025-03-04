@@ -31,6 +31,19 @@ return [
 
     'connections' => [
 
+        'mis' => [
+            'driver' => 'sqlsrv',
+            'host' => env('MIS_DB_HOST', 'localhost'),
+            'port' => env('MIS_DB_PORT', '1433'),
+            'database' => env('MIS_DB_DATABASE', 'laravel'),
+            'username' => env('MIS_DB_USERNAME', 'root'),
+            'password' => env('MIS_DB_PASSWORD', ''),
+            'charset' => env('MIS_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('MIS_DB_ENCRYPT', 'no'),
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),

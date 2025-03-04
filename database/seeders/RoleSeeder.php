@@ -31,6 +31,11 @@ class RoleSeeder extends Seeder
             [ 'name' => 'CAN_READ_JOURNALS', 'description' => 'Доступ к просмотру журналов' ],
             [ 'name' => 'CAN_UPDATE_JOURNALS', 'description' => 'Доступ к редактированию журналов' ],
             [ 'name' => 'CAN_DELETE_JOURNALS', 'description' => 'Доступ к удалению журналов' ],
+
+            [ 'name' => 'CAN_DOWNLOAD_CERTIFICATION', 'description' => 'Разрешение на скачивание сертификата' ],
+            [ 'name' => 'CAN_INSTALL_CERTIFICATION_ON_MIS', 'description' => 'Разрешение на установки сертификата в МИС' ],
+
+            [ 'name' => 'CAN_ADMIN', 'description' => 'Признак администратора' ],
         ];
 
         $roles = [
@@ -48,10 +53,15 @@ class RoleSeeder extends Seeder
             [ 'role_id' => 1, 'scope_id' => 7 ],
             [ 'role_id' => 1, 'scope_id' => 8 ],
             [ 'role_id' => 1, 'scope_id' => 9 ],
+            [ 'role_id' => 1, 'scope_id' => 10 ],
+            [ 'role_id' => 1, 'scope_id' => 11 ],
+            [ 'role_id' => 1, 'scope_id' => 12 ],
 
             [ 'role_id' => 2, 'scope_id' => 1 ],
             [ 'role_id' => 2, 'scope_id' => 3 ],
             [ 'role_id' => 2, 'scope_id' => 7 ],
+            [ 'role_id' => 2, 'scope_id' => 10 ],
+            [ 'role_id' => 2, 'scope_id' => 11 ],
         ];
 
         foreach ($scopes as $scope) {

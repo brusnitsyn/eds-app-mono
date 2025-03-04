@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\MisTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 class Certification extends Model
 {
-    use HasFactory;
+    use HasFactory, MisTrait;
 
     protected $fillable = [
         'serial_number',
@@ -20,7 +21,12 @@ class Certification extends Model
         'file_certification',
         'staff_id',
         'close_key_valid_to',
-        'close_key_is_valid'
+        'close_key_is_valid',
+
+        'mis_serial_number',
+        'mis_valid_from',
+        'mis_valid_to',
+        'mis_is_identical',
     ];
 
     public function staff(): \Illuminate\Database\Eloquent\Relations\HasOne
@@ -28,7 +34,7 @@ class Certification extends Model
         return $this->hasOne(Staff::class, 'id', 'staff_id');
     }
 
-    public function actual()
+    public function actual(): array
     {
         $now = Carbon::now();
         $validTo = Carbon::createFromTimestampMs($this->valid_to);

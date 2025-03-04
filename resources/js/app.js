@@ -8,7 +8,6 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import {createI18n} from "vue-i18n"
 import ru from './Lang/ru.json'
 import {mask} from "vue-the-mask";
-import { AuthPlugin } from "@/Modules/Auth/auth.plugin.ts";
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -28,8 +27,6 @@ createInertiaApp({
         app.use(plugin)
         app.use(ZiggyVue)
         app.use(i18n)
-        app.use(AuthPlugin)
-        app.provide('scopes', app.config.globalProperties['$scopes'])
 
         app.directive('mask', mask)
 

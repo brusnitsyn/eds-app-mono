@@ -19,6 +19,7 @@ import {isLargeScreen, isMediumScreen, isSmallScreen} from "@/Utils/mediaQuery.j
 import { useI18n } from 'vue-i18n'
 import {useCheckScope} from "@/Composables/useCheckScope.js";
 const { t } = useI18n()
+const {hasScope, scopes} = useCheckScope()
 
 const props = defineProps({
     title: String,
@@ -42,7 +43,7 @@ const mobileMenuCollapsed = ref(false)
 function renderIcon(icon) {
     return () => h(NIcon, null, { default: () => h(icon) })
 }
-const scopes = inject('scopes')
+
 const menuOptions = [
     {
         label: () => h(
@@ -56,7 +57,7 @@ const menuOptions = [
         ),
         key: 'Staff',
         icon: renderIcon(IconUsers),
-        show: useCheckScope([scopes.CAN_READ_STAFF])
+        show: hasScope(scopes.CAN_READ_STAFF)
     },
     {
         label: () => h(
@@ -70,7 +71,7 @@ const menuOptions = [
         ),
         key: 'Journals',
         icon: renderIcon(IconTable),
-        show: useCheckScope([scopes.CAN_READ_JOURNALS])
+        show: hasScope(scopes.CAN_READ_JOURNALS)
     },
     {
         label: () => h(
@@ -84,7 +85,7 @@ const menuOptions = [
         ),
         key: 'Admin',
         icon: renderIcon(IconTable),
-        show: useCheckScope([scopes.CAN_ADMIN])
+        show: hasScope(scopes.CAN_ADMIN)
     }
 ]
 
@@ -139,7 +140,7 @@ const activeTitle = computed(() => {
 
 const logout = () => {
     router.post(route('logout'));
-    router.reload()
+    router.replace(route('login'))
 }
 </script>
 
@@ -250,6 +251,7 @@ const logout = () => {
                 <NMenu :options="menuOptions" :value="currentRoute" />
             </NDrawerContent>
         </NDrawer>
+
         <NModal v-model:show="showWelcomeDialog" preset="card" class="max-w-xl" :mask-closable="false" @after-leave="lastUpdate = packageJson.date">
             <template #header>
                 <NSpace vertical :size="0">
@@ -267,9 +269,10 @@ const logout = () => {
                     </NSpace>
                 </NSpace>
             </template>
-            <div class="bg-white">
 
-            </div>
+            <NScrollbar class="max-h-96">
+                <div v-html="usePage().props.newspaper" class="prose-sm" />
+            </NScrollbar>
         </NModal>
     </NaiveLayout>
 </template>

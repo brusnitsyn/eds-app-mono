@@ -16,9 +16,19 @@ import {
     useThemeVars
 } from "naive-ui";
 import {format, toDate} from "date-fns";
-import {IconAlertCircleFilled, IconCloudUp, IconDatabaseImport, IconProgressCheck, IconDownload} from "@tabler/icons-vue";
+import {
+    IconAlertCircleFilled,
+    IconCloudUp,
+    IconDatabaseImport,
+    IconProgressCheck,
+    IconDownload,
+    IconDatabaseSearch
+} from "@tabler/icons-vue";
 import AppCopyButton from "@/Components/AppCopyButton.vue";
-import {router} from "@inertiajs/vue3";
+import { useCheckScope } from '@/Composables/useCheckScope.js'
+
+const { hasScope, scopes } = useCheckScope()
+
 const props = defineProps({
     staff: Object
 })
@@ -33,35 +43,6 @@ const onDownloadUrl = computed(() => route('certification.download', {
         <NGrid :cols="5" :x-gap="16">
             <NGi span="3">
                 <NSpace vertical class="max-w-3xl">
-<!--                    <NCard class="relative">-->
-<!--                        <NFlex class="absolute top-4 right-4">-->
-<!--                            <NTag v-if="staff.mis_user_id != null" type="info" round>-->
-<!--                                ТМ:МИС {{ format(new Date(staff.mis_sync_at), 'dd.MM.yyyy') }} в {{ format(new Date(staff.mis_sync_at), 'HH:mm') }}-->
-<!--                                <template #icon>-->
-<!--                                    <NIcon :component="IconProgressCheck" :size="20" />-->
-<!--                                </template>-->
-<!--                            </NTag>-->
-<!--                        </NFlex>-->
-<!--                        <NButton class="absolute top-2 left-0 -translate-x-1/2" :style="{ border: '1px', borderColor: useThemeVars().value.borderColor, borderStyle: 'solid' }" :color="useThemeVars().value.cardColor" :text-color="useThemeVars().value.textColor3" circle>-->
-<!--                            <template #icon>-->
-<!--                                <NIcon :component="IconChevronLeft" />-->
-<!--                            </template>-->
-<!--                        </NButton>-->
-<!--                        <NAvatar round :size="120" class="font-bold text-3xl">-->
-<!--                            {{ staff.last_name[0] }}{{ staff.first_name[0] }}-->
-<!--                        </NAvatar>-->
-<!--                        <template #action>-->
-<!--                            <NFlex justify="space-between" align="center">-->
-<!--                                <NText class="text-lg font-bold">-->
-<!--                                    {{ staff.full_name }}-->
-<!--                                </NText>-->
-
-<!--                                <NText v-if="staff.mis_user_id">-->
-<!--                                    #{{ staff.mis_user_id }}-->
-<!--                                </NText>-->
-<!--                            </NFlex>-->
-<!--                        </template>-->
-<!--                    </NCard>-->
 
                     <NGrid cols="2" x-gap="12">
                         <NGi>
@@ -76,7 +57,19 @@ const onDownloadUrl = computed(() => route('certification.download', {
                     </NGrid>
 
                     <NSpace>
-                        <NTag v-if="staff.mis_user_id !== null" type="info">
+                        <NTag v-if="staff.mis_user_id != null" type="info">
+                            {{ staff.mis_user_id }}
+                            <template #icon>
+                                <NTooltip>
+                                    <template #trigger>
+                                        <NIcon :component="IconDatabaseSearch" :size="20" />
+                                    </template>
+                                    Идентификатор в базе ТМ:МИС
+                                </NTooltip>
+                            </template>
+                        </NTag>
+
+                        <NTag v-if="staff.mis_sync_at !== null" type="info">
                             ТМ:МИС {{ format(new Date(staff.mis_sync_at), 'dd.MM.yyyy') }} в {{ format(new Date(staff.mis_sync_at), 'HH:mm') }}
                             <template #icon>
                                 <NIcon :component="IconProgressCheck" :size="20" />
@@ -136,26 +129,26 @@ const onDownloadUrl = computed(() => route('certification.download', {
                     <NCard title="Сведения о сертификате">
                         <template #header-extra>
                             <NButtonGroup>
-
-                                <NTooltip>
+                                <NTooltip v-if="staff.mis_user_id != null && hasScope(scopes.CAN_INSTALL_CERTIFICATION_ON_MIS)">
                                     <template #trigger>
-                                        <NButton tag="a" target="_blank" :href="onDownloadUrl" quaternary>
-                                            <template #icon>
-                                                <IconDownload />
-                                            </template>
-                                        </NButton>
-                                    </template>
-                                    Скачать сертификат
-                                </NTooltip>
-                                <NTooltip v-if="staff.certification.has_mis_identical === false && staff.mis_user_id != null">
-                                    <template #trigger>
-                                        <NButton quaternary>
+                                        <NButton tertiary type="info">
                                             <template #icon>
                                                 <NIcon :component="IconCloudUp" />
                                             </template>
                                         </NButton>
                                     </template>
                                     Установить в ТМ:МИС
+                                </NTooltip>
+
+                                <NTooltip v-if="hasScope(scopes.CAN_DOWNLOAD_CERTIFICATION)">
+                                    <template #trigger>
+                                        <NButton tag="a" target="_blank" :href="onDownloadUrl" tertiary type="info">
+                                            <template #icon>
+                                                <IconDownload />
+                                            </template>
+                                        </NButton>
+                                    </template>
+                                    Скачать сертификат
                                 </NTooltip>
                             </NButtonGroup>
                         </template>
@@ -170,7 +163,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
                                             {{ staff.certification.serial_number }}
                                         </NText>
                                     </NGi>
-                                    <NGi v-if="staff.certification.has_mis_identical === false && staff.mis_user_id != null">
+                                    <NGi v-if="staff.certification.mis_is_identical === false && staff.mis_user_id !== null">
                                         <NTag type="warning" round class="-ml-6">
                                             <div class="!text-sm">
                                                 Сертификат отличается

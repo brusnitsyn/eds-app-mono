@@ -197,6 +197,10 @@ return [
                              'type' => 'string',
                          ],
                          [
+                             'name' => 'job_title',
+                             'type' => 'string',
+                         ],
+                         [
                              'name' => 'inn',
                              'type' => 'string',
                          ],

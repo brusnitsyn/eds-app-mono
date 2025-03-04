@@ -2,21 +2,24 @@
 
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
-
-Route::get('/', function () {
-    return Inertia::render('Index', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'staffCount' => \App\Models\Staff::count()
-    ]);
-});
+use Laravel\Jetstream\Jetstream;
 
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
 ])->group(function () {
+
+    Route::get('/', function () {
+        return Inertia::render('Index', [
+            'canLogin' => Route::has('login'),
+            'canRegister' => Route::has('register'),
+            'staffCount' => \App\Models\Staff::count()
+        ]);
+    });
+
     Route::resource('staff', \App\Http\Controllers\StaffController::class);
     Route::get('/certification/download/{staff_ids}', [\App\Http\Controllers\StaffController::class, 'downloadCertificates'])->name('certification.download');
 //    Route::resource('journal', \App\Http\Controllers\JournalController::class);

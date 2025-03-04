@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\MisTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -9,7 +10,7 @@ use Laravel\Scout\Searchable;
 
 class Staff extends Model
 {
-    use HasFactory, Searchable;
+    use HasFactory, Searchable, MisTrait;
 
     protected $fillable = [
         'first_name',
@@ -23,6 +24,8 @@ class Staff extends Model
         'dob',
         'tel',
         'division_id',
+        'mis_user_id',
+        'mis_sync_at'
     ];
 
     public function division(): \Illuminate\Database\Eloquent\Relations\HasOne

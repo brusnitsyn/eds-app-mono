@@ -8,6 +8,9 @@ import {Link, Head, router, usePage, useForm} from "@inertiajs/vue3";
 import {debounce} from "@/Utils/debounce.js";
 import CreateStaffForm from "@/Pages/Staff/Partials/CreateStaffForm.vue";
 import {encode, normalizeURL} from "ufo";
+import {useCheckScope} from "@/Composables/useCheckScope.js";
+
+const { hasScope, scopes } = useCheckScope()
 
 const props = defineProps({
     staffs: Array,
@@ -197,7 +200,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
                         <NRadioButton label="Недействительные" value="no-valid" />
                     </NRadioGroup>
 
-                    <NButton v-if="checkedRowKeys.length" tag="a" target="_blank" secondary :href="onDownloadUrl">
+                    <NButton v-if="checkedRowKeys.length && hasScope(scopes.CAN_DOWNLOAD_CERTIFICATION)" tag="a" target="_blank" secondary :href="onDownloadUrl">
                         <template #icon>
                             <NIcon :component="IconFileZip" />
                         </template>
@@ -216,13 +219,13 @@ const onDownloadUrl = computed(() => route('certification.download', {
             </NSpace>
         </template>
         <template #headermore>
-            <NButton type="tertiary" :disabled="form.processing" :loading="form.processing">
+            <NButton type="primary" tertiary :disabled="form.processing" :loading="form.processing">
                 <template #icon>
                     <NIcon :component="IconFileSpreadsheet" />
                 </template>
                 Экспортировать
             </NButton>
-            <NButton type="primary" @click="hasShowCreateStaffModal = true" :disabled="form.processing" :loading="form.processing">
+            <NButton v-if="hasScope(scopes.CAN_CREATE_STAFF)" type="primary" @click="hasShowCreateStaffModal = true" :disabled="form.processing" :loading="form.processing">
                 <template #icon>
                     <NIcon :component="IconSquareRoundedPlus" />
                 </template>
