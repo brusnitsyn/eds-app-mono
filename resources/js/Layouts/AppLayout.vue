@@ -252,7 +252,7 @@ const logout = () => {
             </NDrawerContent>
         </NDrawer>
 
-        <NModal v-model:show="showWelcomeDialog" preset="card" class="max-w-xl" :mask-closable="false" @after-leave="lastUpdate = packageJson.date">
+        <NModal v-model:show="showWelcomeDialog" :closable="false" preset="card" class="max-w-xl" :mask-closable="false" @after-leave="lastUpdate = packageJson.date">
             <template #header>
                 <NSpace vertical :size="0">
                     <NText class="text-base">
@@ -271,8 +271,12 @@ const logout = () => {
             </template>
 
             <NScrollbar class="max-h-96">
-                <div v-html="usePage().props.newspaper" class="prose-sm" />
+                <div v-html="usePage().props.newspaper" class="prose-naive" />
             </NScrollbar>
+
+            <NButton block secondary type="primary" class="mt-4" @click="showWelcomeDialog = false">
+                Понятно, спасибо
+            </NButton>
         </NModal>
     </NaiveLayout>
 </template>

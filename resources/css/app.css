@@ -40,4 +40,88 @@
         font-weight: 800;
         src: url("/fonts/Golos-Text_Black.ttf");
     }
+
+    .prose-naive {
+        color: #1f2937; /* Основной цвет текста */
+        max-width: 65ch; /* Ограничение ширины для удобства чтения */
+    }
+
+    .prose-naive h1 {
+        font-size: 2rem;
+        font-weight: 600;
+        color: #1a1a1a; /* Цвет заголовка */
+        margin-top: 1.5em;
+        margin-bottom: 0.5em;
+    }
+
+    .prose-naive h2 {
+        @apply text-base uppercase font-medium mt-0.5 mb-3;
+    }
+
+    .prose-naive h3 {
+        @apply text-base font-medium mt-1.5;
+    }
+
+    .prose-naive p {
+        @apply text-base;
+    }
+
+    .prose-naive a {
+        color: #2080f0; /* Цвет ссылок в NaiveUI */
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .prose-naive a:hover {
+        @apply underline;
+    }
+
+    .prose-naive ul,
+    .prose-naive ol {
+        @apply pl-[26px] py-0.5;
+    }
+
+    .prose-naive li {
+        @apply my-1.5;
+    }
+
+    .prose-naive blockquote {
+        font-style: italic;
+        color: #666;
+        border-left: 4px solid #e5e7eb;
+        padding-left: 1em;
+        margin-top: 1.5em;
+        margin-bottom: 1.5em;
+    }
+
+    .prose-naive code {
+        font-family: monospace;
+        background-color: #f3f4f6;
+        padding: 0.25em 0.5em;
+        border-radius: 4px;
+        color: #d946ef; /* Цвет кода */
+    }
+
+    .prose-naive pre {
+        background-color: #f3f4f6;
+        padding: 1em;
+        border-radius: 6px;
+        overflow-x: auto;
+        margin-top: 1.5em;
+        margin-bottom: 1.5em;
+    }
+
+    .prose-naive pre code {
+        background-color: transparent;
+        padding: 0;
+        color: inherit;
+    }
+
+    .prose-naive img {
+        max-width: 100%;
+        height: auto;
+        margin-top: 1.5em;
+        margin-bottom: 1.5em;
+        border-radius: 6px;
+    }
 }
