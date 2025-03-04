@@ -22,6 +22,7 @@ class StaffController extends Controller
         $filters = $request->input('filters', []);
         $searchValue = (string) $request->query('search_value');
         $validType = $request->query('valid_type');
+        $page = $request->query('page', 1);
         $pageSize = $request->query('page_size', 25);
 
         // Определяем, используем ли мы Scout или обычный запрос
@@ -41,8 +42,9 @@ class StaffController extends Controller
 
             // Фильтруем по сертификации, если указан validType
             if (isset($validType)) {
-                $staffs = $staffs->filter(function ($staff) use ($validType) {
-                    return $staff->certification()->where(function ($q) use ($validType) {
+                $staffs = $staffs->filter(function ($staff) use ($validType, $page) {
+                    return $staff->certification()->where(function ($q) use ($validType, $page) {
+                        $page = 1;
                         if ($validType == 'no-valid') {
                             $q->where('is_valid', false);
                         } else if ($validType == 'new-request') {
@@ -57,17 +59,18 @@ class StaffController extends Controller
 
             // Пагинация вручную
             $staffs = new LengthAwarePaginator(
-                $staffs->forPage(request('page', 1), $pageSize),
+                $staffs->forPage($page, $pageSize),
                 $staffs->count(),
                 $pageSize,
-                request('page', 1)
+                $page
             );
         } else {
             // Если это обычный Eloquent-запрос, используем with и whereHas
             $query->with('certification');
 
             if (isset($validType)) {
-                $query->whereHas('certification', function ($query) use ($validType) {
+                $query->whereHas('certification', function ($query) use ($validType, $page) {
+                    $page = 1;
                     if ($validType == 'no-valid') {
                         $query->where('is_valid', false);
                     } else if ($validType == 'new-request') {
@@ -77,7 +80,7 @@ class StaffController extends Controller
             }
 
             // Пагинация через Eloquent
-            $staffs = $query->paginate($pageSize);
+            $staffs = $query->paginate($pageSize, page: $page);
         }
 
         // Если нет результатов, возвращаем пустой массив

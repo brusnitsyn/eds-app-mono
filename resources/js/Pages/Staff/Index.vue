@@ -115,10 +115,9 @@ const columns = [
     // }
 ]
 
-/// TODO: доделать фильтрацию по должностям
 const handleFiltersChange = (filters) => {
     const jobTitles = Array.from(filters.job_title)
-    router.get('/staff', { ...router.page.props.ziggy.query, filters: { job_title: jobTitles } }, { preserveState: false })
+    router.get('/staff', { ...router.page.props.ziggy.query, filters: { job_title: jobTitles }, page: 1 }, { preserveState: false })
 }
 const staffType = ref(router.page.props.ziggy.query.valid_type)
 const computedStaffType = computed({
@@ -127,7 +126,7 @@ const computedStaffType = computed({
     },
     set(value) {
         staffType.value = value
-        router.get('/staff', { ...router.page.props.ziggy.query, valid_type: value }, { preserveState: false })
+        router.get('/staff', { ...router.page.props.ziggy.query, valid_type: value, page: 1 }, { preserveState: false })
     }
 })
 
@@ -207,7 +206,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
                 </NFlex>
                 <NInputGroup class="max-w-xl">
 <!--                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />-->
-                    <NInput ref="searchInputRef" v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="Значение поиска" @keydown.enter.prevent="searchStaff" :loading="form.processing" />
+                    <NInput ref="searchInputRef" v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="ФИО / СНИЛС / ИНН" @keydown.enter.prevent="searchStaff" :loading="form.processing" />
                     <NButton :loading="form.processing" size="large" @click="searchStaff">
                         <template #icon>
                             <NIcon :component="IconSearch" />
