@@ -212,7 +212,7 @@ return [
                      'default_sorting_field' => 'created_at',
                  ],
                  'search-parameters' => [
-                     'query_by' => 'full_name'
+                     'query_by' => '*'
                  ],
              ],
         ],
