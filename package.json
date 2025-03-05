@@ -5,7 +5,9 @@
     "date": "2025-03-05",
     "scripts": {
         "build": "vite build && vite build --ssr",
-        "dev": "vite"
+        "dev": "vite",
+        "queue:start": "php artisan queue:restart && php artisan reverb:restart && npm run queue:remove && pm2 start pm2.json",
+        "queue:remove": "pm2 delete pm2.json"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^1.0.14",
