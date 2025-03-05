@@ -20,6 +20,7 @@ import { useI18n } from 'vue-i18n'
 import {useCheckScope} from "@/Composables/useCheckScope.js";
 const { t } = useI18n()
 const {hasScope, scopes} = useCheckScope()
+import {onMounted} from "vue"
 
 const props = defineProps({
     title: String,
@@ -142,6 +143,18 @@ const logout = () => {
     router.post(route('logout'));
     router.replace(route('login'))
 }
+
+const processingCertification = ref({
+    status: null,
+    message: ''
+})
+
+onMounted(() => {
+    window.Echo.channel(`certificate.processing`)
+        .listen('CertificateProcessingEvent', (data) => {
+            processingCertification.value = data
+        })
+})
 </script>
 
 <template>
@@ -159,7 +172,7 @@ const logout = () => {
                                 ЭРСП
                             </span>
                         </Link>
-                        <NSpace class="-m-5 -mr-[24px]" :size="0">
+                        <NSpace class="-m-5 -mr-[24px]" :size="0" align="center">
                             <NDropdown v-if="user && isLargeScreen" trigger="click" placement="top-end" :options="userOptions" @select="(key, option) => option.onClick()">
                                 <NButton quaternary class="h-[61px] rounded-none hidden md:block">
                                     <NSpace align="center">
@@ -181,7 +194,7 @@ const logout = () => {
                         </NSpace>
                     </NFlex>
                 </NLayoutHeader>
-                <NLayout has-sider position="absolute" style="top: 61px; bottom: 46px">
+                <NLayout has-sider position="absolute" style="top: 61px; bottom: 47px">
                     <NLayoutSider v-if="isLargeScreen" collapse-mode="width" collapsed-width="0" width="260" :collapsed="largeMenuCollapsed" show-trigger @collapse="largeMenuCollapsed = true"
                                   @expand="largeMenuCollapsed = false" :collapsed-trigger-class="largeMenuCollapsed === true ? '!-right-5 !top-1/4' : ''" trigger-class="!top-1/4" bordered content-class="">
                         <NMenu :options="menuOptions" :value="currentRoute" />
@@ -229,7 +242,15 @@ const logout = () => {
                     position="absolute"
                     class="p-3 px-[24px]"
                 >
-                    &copy; <Link href="https://github.com/brusnitsyn">@brusnitsyn</Link> 2024
+                    <NFlex justify="space-between" align="center">
+                        <div>
+                            &copy; <Link href="https://github.com/brusnitsyn">@brusnitsyn</Link> 2024
+                        </div>
+                        <NTag v-if="processingCertification.status !== null" size="small" round :type="processingCertification.type">
+                            <template #icon />
+                            {{ processingCertification.message }}
+                        </NTag>
+                    </NFlex>
                 </NLayoutFooter>
             </NLayout>
         </div>
