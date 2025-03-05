@@ -2,7 +2,7 @@
     "private": true,
     "type": "module",
     "version": "1.2.0",
-    "date": "2024-12-27",
+    "date": "2025-03-05",
     "scripts": {
         "build": "vite build && vite build --ssr",
         "dev": "vite"
