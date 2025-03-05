@@ -10,6 +10,17 @@
             "error_file": "./storage/logs/queue.error.log",
             "out_file": "./storage/logs/queue.out.log",
             "pid_file": "./storage/logs/queue.pid"
+        },
+        {
+            "name": "eds_mono_websocks",
+            "script": "artisan",
+            "watch": false,
+            "interpreter": "php",
+            "args": "reverb:start",
+            "restart_delay": 3000,
+            "error_file": "./storage/logs/websocks.error.log",
+            "out_file": "./storage/logs/websocks.out.log",
+            "pid_file": "./storage/logs/websocks.pid"
         }
     ]
 }
