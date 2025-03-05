@@ -1,7 +1,7 @@
 {
     "apps": [
         {
-            "name": "eds_queue",
+            "name": "eds_mono_queue",
             "script": "artisan",
             "watch": false,
             "interpreter": "php",
