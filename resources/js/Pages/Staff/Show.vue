@@ -26,6 +26,7 @@ import {
 } from "@tabler/icons-vue";
 import AppCopyButton from "@/Components/AppCopyButton.vue";
 import { useCheckScope } from '@/Composables/useCheckScope.js'
+import {router} from "@inertiajs/vue3";
 
 const { hasScope, scopes } = useCheckScope()
 
@@ -36,6 +37,12 @@ const props = defineProps({
 const onDownloadUrl = computed(() => route('certification.download', {
     staff_ids: [props.staff.id],
 }, true))
+
+const onInstall = () => {
+    router.post(route('certification.install', {
+        staff_ids: [props.staff.id],
+    }))
+}
 </script>
 
 <template>
@@ -46,8 +53,8 @@ const onDownloadUrl = computed(() => route('certification.download', {
 
                     <NGrid cols="2" x-gap="12">
                         <NGi>
-                            <NAlert v-if="staff.certification.is_valid" title="Сертификат действителен" type="success" />
-                            <NAlert v-else-if="staff.certification.is_valid && staff.certification.is_request_new" title="Срок действия сертификата подходит к концу" type="warning" />
+                            <NAlert v-if="staff.certification.is_valid && staff.certification.is_request_new" title="Требуется перевыпуск" type="warning" />
+                            <NAlert v-else-if="staff.certification.is_valid" title="Сертификат действителен" type="success" />
                             <NAlert v-else title="Сертификат не действителен" type="error" />
                         </NGi>
                         <NGi>
@@ -70,7 +77,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
                         </NTag>
 
                         <NTag v-if="staff.mis_sync_at !== null" type="info">
-                            ТМ:МИС {{ format(new Date(staff.mis_sync_at), 'dd.MM.yyyy') }} в {{ format(new Date(staff.mis_sync_at), 'HH:mm') }}
+                            ТМ:МИС <NTime :time="staff.mis_sync_at" format="dd.MM.yyyy" /> в <NTime :time="staff.mis_sync_at" format="HH:mm" />
                             <template #icon>
                                 <NIcon :component="IconProgressCheck" :size="20" />
                             </template>
@@ -131,7 +138,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
                             <NButtonGroup>
                                 <NTooltip v-if="staff.mis_user_id != null && hasScope(scopes.CAN_INSTALL_CERTIFICATION_ON_MIS)">
                                     <template #trigger>
-                                        <NButton tertiary type="info">
+                                        <NButton tertiary type="info" @click="onInstall">
                                             <template #icon>
                                                 <NIcon :component="IconCloudUp" />
                                             </template>
@@ -164,7 +171,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
                                         </NText>
                                     </NGi>
                                     <NGi v-if="staff.certification.mis_is_identical === false && staff.mis_user_id !== null">
-                                        <NTag type="warning" round class="-ml-6">
+                                        <NTag type="warning" round>
                                             <div class="!text-sm">
                                                 Сертификат отличается
                                             </div>

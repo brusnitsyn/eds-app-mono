@@ -9,7 +9,10 @@ use App\Models\Certification;
 use App\Models\Staff;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use PhpZip\ZipFile;
@@ -38,7 +41,7 @@ class StaffController extends Controller
 
         // Если это Scout-запрос, сначала получаем результаты, затем фильтруем и загружаем отношения
         if ($isScoutSearch) {
-            $staffs = $query->get();
+            $staffs = $query->orderBy('created_at')->get();
 
             // Фильтруем по сертификации, если указан validType
             if (isset($validType)) {
@@ -66,7 +69,7 @@ class StaffController extends Controller
             );
         } else {
             // Если это обычный Eloquent-запрос, используем with и whereHas
-            $query->with('certification');
+            $query->orderBy('created_at')->with('certification');
 
             if (isset($validType)) {
                 $query->whereHas('certification', function ($query) use ($validType, $page) {
@@ -80,7 +83,7 @@ class StaffController extends Controller
             }
 
             // Пагинация через Eloquent
-            $staffs = $query->paginate($pageSize, page: $page);
+            $staffs = $query->paginate($pageSize);
         }
 
         // Если нет результатов, возвращаем пустой массив
@@ -125,6 +128,15 @@ class StaffController extends Controller
         return Inertia::render('Staff/Show', [
             'staff' => $staff
         ]);
+    }
+
+    public function destroy(Staff $staff)
+    {
+        if (Storage::disk('certification')->exists($staff->certification->path_certification))
+            Storage::disk('certification')->deleteDirectory($staff->certification->path_certification);
+
+        $staff->certification()->delete();
+        $staff->delete();
     }
 
     public function downloadCertificates(Request $request, $staff_ids)
@@ -177,5 +189,65 @@ class StaffController extends Controller
         $zip->close();
 
         return response()->download($zipPath)->deleteFileAfterSend();
+    }
+
+    public function installCertificates(Request $request)
+    {
+        $staffIds = $request->input('staff_ids');
+
+        $staffs = Staff::whereIn('id', $staffIds)->get();
+
+        foreach ($staffs as $staff) {
+            $misUserId = $staff->mis_user_id;
+            $serialNumber = $staff->certification->serial_number;
+            $validFrom = $staff->certification->valid_from;
+            $validTo = $staff->certification->valid_to;
+
+            // Обновить номер сертификата
+            DB::connection('mis')->table('amu_mis_AOKB_prod.dbo.x_UserSettings')->updateOrInsert([
+                'rf_UserID' => $misUserId,
+                'Property' => 'Номер сертификата пользователя'
+            ], [
+                'rf_SettingTypeID' => 7,
+                'ValueStr' => $serialNumber,
+                'OwnerGUID' => '00000000-0000-0000-0000-000000000000',
+                'DocTypeDefGUID' => '00000000-0000-0000-0000-000000000000'
+            ]);
+
+            // Обновить сертификат действителен с
+            DB::connection('mis')->table('amu_mis_AOKB_prod.dbo.x_UserSettings')->updateOrInsert([
+                'rf_UserID' => $misUserId,
+                'Property' => 'Сертификат действителен с'
+            ], [
+                'rf_SettingTypeID' => 7,
+                'ValueStr' => $validFrom,
+                'OwnerGUID' => '00000000-0000-0000-0000-000000000000',
+                'DocTypeDefGUID' => '00000000-0000-0000-0000-000000000000'
+            ]);
+
+            // Обновить сертификат действителен по
+            DB::connection('mis')->table('amu_mis_AOKB_prod.dbo.x_UserSettings')->updateOrInsert([
+                'rf_UserID' => $misUserId,
+                'Property' => 'Сертификат действителен по'
+            ], [
+                'rf_SettingTypeID' => 7,
+                'ValueStr' => $validTo,
+                'OwnerGUID' => '00000000-0000-0000-0000-000000000000',
+                'DocTypeDefGUID' => '00000000-0000-0000-0000-000000000000'
+            ]);
+
+            $staff->certification()->update([
+                'mis_serial_number' => $serialNumber,
+                'mis_valid_from' => $validFrom,
+                'mis_valid_to' => $validTo,
+                'mis_is_identical' => true
+            ]);
+
+            $staff->update([
+                'mis_sync_at' => Carbon::now()->timezone(config('app.timezone'))->getTimestampMs(),
+            ]);
+        }
+
+        return back();
     }
 }

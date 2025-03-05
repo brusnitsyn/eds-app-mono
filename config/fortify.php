@@ -60,7 +60,7 @@ return [
     |
     */
 
-    'lowercase_usernames' => false,
+    'lowercase_usernames' => true,
 
     /*
     |--------------------------------------------------------------------------

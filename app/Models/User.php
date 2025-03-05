@@ -70,6 +70,15 @@ class User extends Authenticatable
         ];
     }
 
+    protected function defaultProfilePhotoUrl(): string
+    {
+        $name = trim(collect(explode(' ', $this->name))->map(function ($segment) {
+            return mb_substr($segment, 0, 1);
+        })->join(' '));
+
+        return 'https://ui-avatars.com/api/?name='.urlencode($name).'&color=18a058&background=e7f5ee&bold=true&uppercase=true&format=svg';
+    }
+
     public function role(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Role::class);

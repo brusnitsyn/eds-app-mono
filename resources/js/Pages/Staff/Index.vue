@@ -1,13 +1,29 @@
 <script setup>
 import AppLayout from "@/Layouts/AppLayout.vue"
-import {NDataTable, NText, NButton, NIcon, NSpace, NFlex, NRadioGroup, NRadioButton, NInputGroup, NSelect, NInput, NModal} from 'naive-ui'
+import {
+    NDataTable,
+    NButton,
+    NIcon,
+    NSpace,
+    NFlex,
+    NRadioGroup,
+    NRadioButton,
+    NInputGroup,
+    NInput,
+    NModal,
+    NTime, NDropdown
+} from 'naive-ui'
 import {computed, h, ref} from "vue"
-import {IconSquareRoundedPlus, IconFileSpreadsheet, IconSearch, IconFileZip} from '@tabler/icons-vue'
-import {format, toDate} from 'date-fns'
+import {
+    IconSquareRoundedPlus,
+    IconFileSpreadsheet,
+    IconSearch,
+    IconFileZip,
+    IconExclamationCircleFilled, IconDots
+} from '@tabler/icons-vue'
 import {Link, Head, router, usePage, useForm} from "@inertiajs/vue3";
 import {debounce} from "@/Utils/debounce.js";
 import CreateStaffForm from "@/Pages/Staff/Partials/CreateStaffForm.vue";
-import {encode, normalizeURL} from "ufo";
 import {useCheckScope} from "@/Composables/useCheckScope.js";
 
 const { hasScope, scopes } = useCheckScope()
@@ -23,6 +39,36 @@ const checkedRowKeys = ref([])
 onMounted(() => {
     searchInputRef.value.focus()
 })
+
+const rowOptions = [
+    {
+        label: 'Скачать сертификат',
+        key: 'download-certification',
+        onClick: (row) => {
+            window.location = route('certification.download', {
+                staff_ids: [row.id],
+            }, true)
+        },
+    },
+    {
+        type: 'divider',
+        show: hasScope(scopes.CAN_DELETE_STAFF),
+    },
+    {
+        label: 'Удалить персону',
+        key: 'delete-staff',
+        show: hasScope(scopes.CAN_DELETE_STAFF),
+        onClick: (row) => {
+            router.delete(route('staff.destroy', {
+                staff: row.id,
+            }), {
+                onSuccess: () => {
+                    router.visit(route('staff.index'))
+                }
+            })
+        },
+    }
+]
 
 const columns = [
     {
@@ -44,13 +90,36 @@ const columns = [
         sortOrder: false,
         render(row) {
             return h(
-                Link,
+                NFlex,
                 {
-                    href: `/staff/${row.id}`,
+                    align: 'center',
                 },
-                {
-                    default: () => row.full_name,
-                }
+                [
+                    h(
+                        Link,
+                        {
+                            href: `/staff/${row.id}`,
+                        },
+                        {
+                            default: () => row.full_name,
+                        }
+                    ),
+                    row.certification.is_request_new ? h(
+                        NIcon,
+                        {
+                            size: 20,
+                            color: '#fcb040',
+                            component: IconExclamationCircleFilled
+                        }
+                    ) : !row.certification.is_valid ? h(
+                        NIcon,
+                        {
+                            size: 20,
+                            color: '#de576d',
+                            component: IconExclamationCircleFilled
+                        }
+                    ) : null
+                ]
             )
         }
     },
@@ -69,10 +138,10 @@ const columns = [
         sorter: 'default',
         render(row) {
             return h(
-                NText,
-                null,
+                NTime,
                 {
-                    default: () => format(toDate(Number(row.certification.valid_to)), 'dd.MM.yyyy'),
+                    format: 'dd.MM.yyyy',
+                    time: Number(row.certification.valid_to)
                 }
             )
         }
@@ -89,33 +158,33 @@ const columns = [
         filterOptionValues: usePage().props.ziggy.query.filters?.job_title,
         filterOptions: props.filterJob
     },
-    // {
-    //     title: '',
-    //     key: 'actions',
-    //     width: 60,
-    //     render(row) {
-    //         return h(
-    //             NFlex,
-    //             {
-    //
-    //             },
-    //             {
-    //                 default: () => h(
-    //                     NDropdown,
-    //                     {
-    //                         trigger: 'click',
-    //                         placement: 'bottom-end',
-    //                         options: rowOptions.value,
-    //                         onSelect: (key, option) => option.onClick(row)
-    //                     },
-    //                     {
-    //                         default: () => h(NButton, { text: true, class: 'text-xl' }, { default: () => h(NIcon, null, { default: () => h(IconDots) }) })
-    //                     }
-    //                 )
-    //             }
-    //         )
-    //     }
-    // }
+    {
+        title: '',
+        key: 'actions',
+        width: 60,
+        render(row) {
+            return h(
+                NFlex,
+                {
+
+                },
+                {
+                    default: () => h(
+                        NDropdown,
+                        {
+                            trigger: 'click',
+                            placement: 'bottom-end',
+                            options: rowOptions,
+                            onSelect: (key, option) => option.onClick(row)
+                        },
+                        {
+                            default: () => h(NButton, { text: true, class: 'text-xl' }, { default: () => h(NIcon, null, { default: () => h(IconDots) }) })
+                        }
+                    )
+                }
+            )
+        }
+    }
 ]
 
 const handleFiltersChange = (filters) => {
@@ -236,8 +305,8 @@ const onDownloadUrl = computed(() => route('certification.download', {
                     :columns="columns"
                     :pagination="paginationReactive"
                     :data="staffs.data"
-                    min-height="calc(100vh - 415px)"
-                    max-height="calc(100vh - 415px)"
+                    min-height="calc(100vh - 416px)"
+                    max-height="calc(100vh - 416px)"
                     :loading="form.processing"
                     @update:filters="handleFiltersChange"
                     :row-key="row => row.id"
