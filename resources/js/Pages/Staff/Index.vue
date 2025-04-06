@@ -189,7 +189,7 @@ const columns = [
 
 const handleFiltersChange = (filters) => {
     const jobTitles = Array.from(filters.job_title)
-    router.get('/staff', { ...router.page.props.ziggy.query, filters: { job_title: jobTitles }, page: 1 }, { preserveState: false })
+    router.get('/staff', { ...router.page.props.ziggy.query, filters: { job_title: jobTitles }, page: 1 }, { preserveState: true })
 }
 const staffType = ref(router.page.props.ziggy.query.valid_type)
 const computedStaffType = computed({
@@ -198,7 +198,7 @@ const computedStaffType = computed({
     },
     set(value) {
         staffType.value = value
-        router.get('/staff', { ...router.page.props.ziggy.query, valid_type: value, page: 1 }, { preserveState: false })
+        router.get('/staff', { ...router.page.props.ziggy.query, valid_type: value, page: 1 }, { preserveState: true })
     }
 })
 
@@ -216,10 +216,10 @@ const paginationReactive = reactive({
     showSizePicker: true,
     pageSizes: [25, 50, 100],
     onChange: (page) => {
-        router.get('/staff', { ...router.page.props.ziggy.query, page }, { preserveState: false })
+        router.get('/staff', { ...router.page.props.ziggy.query, page }, { preserveState: true })
     },
     onUpdatePageSize: (pageSize) => {
-        router.get('/staff', { ...router.page.props.ziggy.query, page: 1, page_size: pageSize }, { preserveState: false })
+        router.get('/staff', { ...router.page.props.ziggy.query, page: 1, page_size: pageSize }, { preserveState: true })
     }
 })
 
@@ -241,7 +241,7 @@ const debounceSearchStaffValue = computed({
 const form = useForm({ valid_type: null, search_field: 'full_name', search_value: null })
 
 function searchStaff() {
-    form.get('/staff', { preserveState: false })
+    form.get('/staff', { preserveState: true })
     // router.get('/staff', { ...router.page.props.ziggy.query, search_field: 'full_name', search_value: searchStaffValue.value }, { preserveState: true })
     // console.log(searchStaffValue.value)
 }
@@ -273,7 +273,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
                         <template #icon>
                             <NIcon :component="IconFileZip" />
                         </template>
-                        Скачать
+                        Скачать ({{ checkedRowKeys.length }})
                     </NButton>
                 </NFlex>
                 <NInputGroup class="max-w-xl">
