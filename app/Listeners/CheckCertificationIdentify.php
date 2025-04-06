@@ -24,6 +24,12 @@ class CheckCertificationIdentify
      */
     public function handle(CertificationCreated|CertificationUpdated $event): void
     {
+        $drivers = collect(DB::availableDrivers());
+
+        if(!$drivers->values()->search('sqlsrv')) {
+            return;
+        }
+
         $staff = $event->certification->staff;
         $misUserId = $staff->mis_user_id;
 
