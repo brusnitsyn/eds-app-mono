@@ -57,6 +57,17 @@ return [
             'driver' => 'local',
             'root' => storage_path('app/temp'),
             'visibility' => 'public',
+            'default_dir_permissions' => 0775,
+            'default_permissions' => [
+                'file' => [
+                    'public' => 0664,
+                    'private' => 0660,
+                ],
+                'dir' => [
+                    'public' => 0775,
+                    'private' => 0770,
+                ]
+            ],
             'throw' => false,
         ],
 
@@ -65,6 +76,17 @@ return [
             'root' => storage_path('app/certifications'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
+            'default_dir_permissions' => 0775,
+            'default_permissions' => [
+                'file' => [
+                    'public' => 0664,
+                    'private' => 0660,
+                ],
+                'dir' => [
+                    'public' => 0775,
+                    'private' => 0770,
+                ]
+            ],
             'throw' => false,
         ],
 
