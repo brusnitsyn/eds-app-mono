@@ -16,7 +16,6 @@
         "laravel/sanctum": "^4.0",
         "laravel/scout": "^10.12",
         "laravel/tinker": "^2.9",
-        "meilisearch/meilisearch-php": "^1.12",
         "nelexa/zip": "^4.0",
         "predis/predis": "^2.3",
         "tightenco/ziggy": "^2.0",
