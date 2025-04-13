@@ -21,6 +21,7 @@ Route::middleware([
     });
 
     Route::resource('staff', \App\Http\Controllers\StaffController::class);
+    Route::get('/reports/export', [\App\Http\Controllers\ReportController::class, 'reportExcel'])->name('staff.export');
     Route::get('/certification/download/{staff_ids}', [\App\Http\Controllers\StaffController::class, 'downloadCertificates'])->name('certification.download');
     Route::post('/certification/install', [\App\Http\Controllers\StaffController::class, 'installCertificates'])->name('certification.install');
 //    Route::resource('journal', \App\Http\Controllers\JournalController::class);

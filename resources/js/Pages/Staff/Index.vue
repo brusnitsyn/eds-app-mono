@@ -279,6 +279,22 @@ const handleCheck = (rowKeys) => {
 const onDownloadUrl = computed(() => route('certification.download', {
     staff_ids: checkedRowKeys.value,
 }, true))
+
+const onExport = () => {
+    window.location.href = route('staff.export');
+    // router.visit(route('staff.export'), {
+    //     headers: {
+    //
+    //     },
+    //     onSuccess: () => {
+    //         // Файл начнет загружаться автоматически
+    //     },
+    //     onError: (errors) => {
+    //         window.$message.error('Ошибка при создании отчета')
+    //         console.error('Ошибка при экспорте:', errors);
+    //     }
+    // });
+}
 </script>
 
 <template>
@@ -312,7 +328,7 @@ const onDownloadUrl = computed(() => route('certification.download', {
             </NSpace>
         </template>
         <template #headermore>
-            <NButton type="primary" tertiary :disabled="form.processing" :loading="form.processing">
+            <NButton type="primary" tertiary @click="onExport" :disabled="form.processing" :loading="form.processing">
                 <template #icon>
                     <NIcon :component="IconFileSpreadsheet" />
                 </template>
