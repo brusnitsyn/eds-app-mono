@@ -46,7 +46,7 @@ class StaffController extends Controller
             // Фильтруем по сертификации, если указан validType
             if (isset($validType)) {
                 $staffs = $staffs->filter(function ($staff) use ($validType, $page) {
-                    return $staff->certification()->where(function ($q) use ($validType, $page) {
+                    return $staff->certification()->latest('created_at')->where(function ($q) use ($validType, $page) {
                         $page = 1;
                         if ($validType == 'no-valid') {
                             $q->where('is_valid', false);
