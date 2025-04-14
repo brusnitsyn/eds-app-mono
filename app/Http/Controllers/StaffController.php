@@ -33,7 +33,10 @@ class StaffController extends Controller
 //        $searchValue = '"' . $searchValue . '"';
 
         // Создаем запрос
-        $query = $isScoutSearch ? Staff::search($searchValue) : Staff::query();
+        $query = $isScoutSearch ? Staff::search($searchValue)->options([
+            'num_typos' => 0,
+            'prioritize_exact_match' => true
+        ]) : Staff::query();
 
         // Применяем фильтр по должности
         if (isset($filters['job_title']) && is_array($filters['job_title'])) {
