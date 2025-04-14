@@ -23,14 +23,13 @@ class StaffController extends Controller
     {
         // Получаем фильтры из запроса
         $filters = $request->input('filters', []);
-        $searchValue = (string) $request->query('search_value');
+        $searchValue = Str::lower((string) $request->query('search_value'));
         $validType = $request->query('valid_type');
         $page = $request->query('page', 1);
         $pageSize = $request->query('page_size', 25);
 
         // Определяем, используем ли мы Scout или обычный запрос
         $isScoutSearch = !empty($searchValue);
-//        $searchValue = '"' . $searchValue . '"';
 
         // Создаем запрос
         $query = $isScoutSearch ? Staff::search($searchValue)->options([

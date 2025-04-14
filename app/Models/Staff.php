@@ -6,6 +6,7 @@ use App\Traits\MisTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
 
 class Staff extends Model
@@ -61,11 +62,11 @@ class Staff extends Model
     {
         return [
             'id' => (string) $this->id,
-            'first_name' => $this->first_name,
-            'middle_name' => $this->middle_name,
-            'last_name' => $this->last_name,
-            'full_name' => $this->full_name,
-            'job_title' => $this->job_title,
+            'first_name' => Str::lower($this->first_name),
+            'middle_name' => Str::lower($this->middle_name),
+            'last_name' => Str::lower($this->last_name),
+            'full_name' => Str::lower($this->full_name),
+            'job_title' => Str::lower($this->job_title),
             'inn' => $this->inn,
             'snils' => $this->snils,
             'created_at' => (int) $this->created_at->timestamp,
