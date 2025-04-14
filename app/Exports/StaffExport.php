@@ -57,7 +57,7 @@ class StaffExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             $staff->certification ? ($staff->certification->is_valid ? 'Да' : 'Нет') : '',
             $staff->certification ? ($staff->certification->valid_from ? Carbon::createFromTimestampMs($staff->certification->valid_from)->format('d.m.Y H:i') : '') : '',
             $staff->certification ? ($staff->certification->valid_to ? Carbon::createFromTimestampMs($staff->certification->valid_to)->format('d.m.Y H:i') : '') : '',
-            $staff->certification ? ($staff->certification->close_key_is_valid ? Carbon::createFromTimestampMs($staff->certification->close_key_is_valid)->format('d.m.Y H:i') : '') : '',
+            $staff->certification ? ($staff->certification->close_key_valid_to ? Carbon::createFromTimestampMs($staff->certification->close_key_valid_to)->format('d.m.Y H:i') : '') : '',
         ];
     }
 
