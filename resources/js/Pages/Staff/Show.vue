@@ -79,7 +79,12 @@ const onInstall = () => {
                         <NTag v-if="staff.mis_sync_at !== null" type="info">
                             ТМ:МИС <NTime :time="staff.mis_sync_at" format="dd.MM.yyyy" /> в <NTime :time="staff.mis_sync_at" format="HH:mm" />
                             <template #icon>
-                                <NIcon :component="IconProgressCheck" :size="20" />
+                                <NTooltip>
+                                    <template #trigger>
+                                        <NIcon :component="IconProgressCheck" :size="20" />
+                                    </template>
+                                    Синхронизация с ТМ:МИС
+                                </NTooltip>
                             </template>
                         </NTag>
 
