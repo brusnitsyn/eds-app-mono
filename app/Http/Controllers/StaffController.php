@@ -71,7 +71,9 @@ class StaffController extends Controller
             );
         } else {
             // Если это обычный Eloquent-запрос, используем with и whereHas
-            $query->orderBy('created_at')->with('certification');
+            $query->orderBy('created_at')->with(['certification' => function($query) {
+                $query->latest('created_at')->limit(1);
+            }]);
 
             if (isset($validType)) {
                 $query->whereHas('certification', function ($query) use ($validType, $page) {
@@ -200,10 +202,13 @@ class StaffController extends Controller
     {
         $staffIds = $request->input('staff_ids');
 
-        $staffs = Staff::whereIn('id', $staffIds)->get();
+        $staffs = Staff::with(['certification' => function($query) {
+            $query->latest('created_at')->limit(1);
+        }])->whereIn('id', $staffIds)->get();
 
         foreach ($staffs as $staff) {
             $misUserId = $staff->mis_user_id;
+
             $serialNumber = $staff->certification->serial_number;
             $validFrom = $staff->certification->valid_from;
             $validTo = $staff->certification->valid_to;
