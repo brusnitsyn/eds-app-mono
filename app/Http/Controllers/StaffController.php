@@ -125,7 +125,9 @@ class StaffController extends Controller
     public function show(Staff $staff)
     {
         $staff = $staff->load('certification');
-        $staff->certification = $staff->certification->latest();
+        $staff->certification = $staff->certification
+            ->latest()
+            ->first();
         return Inertia::render('Staff/Show', [
             'staff' => $staff
         ]);
