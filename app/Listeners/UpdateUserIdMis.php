@@ -31,7 +31,7 @@ class UpdateUserIdMis
             return;
         }
 
-        \Log::debug('Начат поиск ID');
+        \Log::debug('Начат поиск ID, GeneralLogin');
         $staff = $event->staff;
         $FIO = $staff->full_name;
 
@@ -43,12 +43,14 @@ class UpdateUserIdMis
 
             if ($user) {
                 \Log::debug("ID = {$user->UserID}");
+                \Log::debug("GeneralLogin = {$user->GeneralLogin}");
                 $staff->updateQuietly([
                     'mis_user_id' => $user->UserID,
+                    'mis_login' => $user->GeneralLogin,
                 ]);
             }
         } catch (\Exception $e) {
-            \Log::debug("ID не найден");
+            \Log::debug("Пользователь не найден в МИС");
         }
     }
 }

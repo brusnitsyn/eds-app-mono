@@ -22,7 +22,7 @@ import {
     IconDatabaseImport,
     IconProgressCheck,
     IconDownload,
-    IconDatabaseSearch
+    IconDatabaseSearch, IconUserCircle
 } from "@tabler/icons-vue";
 import AppCopyButton from "@/Components/AppCopyButton.vue";
 import { useCheckScope } from '@/Composables/useCheckScope.js'
@@ -80,6 +80,19 @@ const onInstall = () => {
                             ТМ:МИС <NTime :time="staff.mis_sync_at" format="dd.MM.yyyy" /> в <NTime :time="staff.mis_sync_at" format="HH:mm" />
                             <template #icon>
                                 <NIcon :component="IconProgressCheck" :size="20" />
+                            </template>
+                        </NTag>
+
+
+                        <NTag v-if="staff.mis_login != null" type="info">
+                            {{ staff.mis_login }}
+                            <template #icon>
+                                <NTooltip>
+                                    <template #trigger>
+                                        <NIcon :component="IconUserCircle" :size="20" />
+                                    </template>
+                                    Логин ТМ:МИС
+                                </NTooltip>
                             </template>
                         </NTag>
                     </NSpace>

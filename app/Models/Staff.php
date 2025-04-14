@@ -25,7 +25,8 @@ class Staff extends Model
         'tel',
         'division_id',
         'mis_user_id',
-        'mis_sync_at'
+        'mis_sync_at',
+        'mis_login'
     ];
 
     public function division(): \Illuminate\Database\Eloquent\Relations\HasOne
