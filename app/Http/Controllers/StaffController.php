@@ -30,6 +30,7 @@ class StaffController extends Controller
 
         // Определяем, используем ли мы Scout или обычный запрос
         $isScoutSearch = !empty($searchValue);
+        $searchValue = '"' . $searchValue . '"';
 
         // Создаем запрос
         $query = $isScoutSearch ? Staff::search($searchValue) : Staff::query();
