@@ -225,7 +225,7 @@ return [
                              'type' => 'int64',
                          ],
                      ],
-                     'default_sorting_field' => 'full_name',
+                     'default_sorting_field' => 'created_at',
                  ],
                  'search-parameters' => [
                      'query_by' => 'full_name,inn,snils',
