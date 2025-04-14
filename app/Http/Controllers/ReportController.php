@@ -11,7 +11,10 @@ class ReportController extends Controller
 {
     public function reportExcel(Request $request)
     {
-        $data = Staff::with(['certification'])->get();
+        $data = Staff::with(['certification' => function($query) {
+            $query->latest('created_at')->limit(1);
+        }])->get();
+
         return Excel::download(new StaffExport($data), 'staff.xlsx');
     }
 }
