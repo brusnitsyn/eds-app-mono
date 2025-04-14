@@ -35,7 +35,8 @@ class StaffController extends Controller
         // Создаем запрос
         $query = $isScoutSearch ? Staff::search($searchValue)->options([
             'num_typos' => 1,
-            'prioritize_exact_match' => true
+            'prioritize_exact_match' => true,
+            'pre_segmented_query' => true
         ]) : Staff::query();
 
         // Применяем фильтр по должности
