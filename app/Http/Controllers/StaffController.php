@@ -34,7 +34,7 @@ class StaffController extends Controller
 
         // Создаем запрос
         $query = $isScoutSearch ? Staff::search($searchValue)->options([
-            'num_typos' => 0,
+            'num_typos' => 1,
             'prioritize_exact_match' => true
         ]) : Staff::query();
 
