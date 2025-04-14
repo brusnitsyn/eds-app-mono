@@ -77,7 +77,15 @@ class StaffController extends Controller
 
             if (isset($validType)) {
                 $query->whereHas('certification', function ($query) use ($validType, $page) {
-                    $page = 1;
+                    // Подзапрос для получения только последней сертификации
+                    $query->whereIn('id', function($subQuery) {
+                        $subQuery->select('id')
+                            ->from('certifications')
+                            ->whereColumn('staff_id', 'staff.id')
+                            ->orderBy('created_at', 'desc')
+                            ->limit(1);
+                    });
+
                     if ($validType == 'no-valid') {
                         $query->where('is_valid', false);
                     } else if ($validType == 'new-request') {
