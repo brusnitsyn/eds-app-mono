@@ -58,7 +58,9 @@ class StaffController extends Controller
             }
 
             // Загружаем отношение certification
-            $staffs->load('certification');
+            $staffs->load(['certification' => function($query) {
+                $query->latest('created_at')->limit(1);
+            }]);
 
             // Пагинация вручную
             $staffs = new LengthAwarePaginator(
