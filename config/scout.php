@@ -229,7 +229,8 @@ return [
                  ],
                  'search-parameters' => [
                      'query_by' => 'first_name,middle_name,last_name,full_name,job_title,inn,snils',
-                     'num_typos' => 1
+                     'num_typos' => 1,
+                     'prioritize_exact_match' => true
                  ],
              ],
         ],
