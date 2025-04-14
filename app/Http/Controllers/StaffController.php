@@ -126,7 +126,7 @@ class StaffController extends Controller
     {
         $staff = $staff->load('certification');
         $staff->certification = $staff->certification
-            ->latest()
+            ->latest('created_at')
             ->first();
         return Inertia::render('Staff/Show', [
             'staff' => $staff
