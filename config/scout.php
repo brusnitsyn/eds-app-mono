@@ -225,10 +225,11 @@ return [
                              'type' => 'int64',
                          ],
                      ],
-                     'default_sorting_field' => 'created_at',
+                     'default_sorting_field' => 'full_name',
                  ],
                  'search-parameters' => [
                      'query_by' => 'full_name,inn,snils',
+                     'exhaustive_search' => true
                  ],
              ],
         ],
