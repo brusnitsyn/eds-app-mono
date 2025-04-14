@@ -207,6 +207,7 @@ return [
                          [
                              'name' => 'full_name',
                              'type' => 'string',
+                             'infix' => true
                          ],
                          [
                              'name' => 'job_title',
