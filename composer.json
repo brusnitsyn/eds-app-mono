@@ -20,7 +20,8 @@
         "nelexa/zip": "^4.0",
         "predis/predis": "^2.3",
         "tightenco/ziggy": "^2.0",
-        "typesense/typesense-php": "^4.9"
+        "typesense/typesense-php": "^4.9",
+        "ext-bcmath": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
