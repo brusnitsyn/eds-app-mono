@@ -86,7 +86,7 @@ const menuOptions = [
         ),
         key: 'Mis',
         icon: renderIcon(IconDatabaseEdit),
-        show: hasScope(scopes.CAN_ADMIN)
+        show: true
     },
     {
         label: () => h(
