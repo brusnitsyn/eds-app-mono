@@ -1,5 +1,5 @@
 import { usePage } from '@inertiajs/vue3';
-import {Scopes} from "@/auth.constants.js";
+import {Roles, Scopes} from "@/auth.constants.js";
 
 export function useCheckScope() {
     const { props } = usePage()
@@ -14,14 +14,20 @@ export function useCheckScope() {
     }
 
     const hasRole = (role) => {
-        return props.auth.user && props.auth.user.role.name === role
+        if (!props.auth.user)
+            return false
+
+        return props.auth.user.role.name === role
     }
 
     const scopes = Scopes
 
+    const roles = Roles
+
     return {
         hasScope,
         hasRole,
-        scopes
+        scopes,
+        roles
     }
 }

@@ -16,3 +16,8 @@ export const Scopes = {
 
     CAN_ADMIN: 'CAN_ADMIN',
 }
+
+export const Roles = {
+    ROLE_ADMIN: 'ROLE_ADMIN',
+    ROLE_HELPER_MIS: 'ROLE_HELPER_MIS'
+}

@@ -19,7 +19,7 @@ import {isLargeScreen, isMediumScreen, isSmallScreen} from "@/Utils/mediaQuery.j
 import { useI18n } from 'vue-i18n'
 import {useCheckScope} from "@/Composables/useCheckScope.js";
 const { t } = useI18n()
-const {hasScope, scopes} = useCheckScope()
+const {hasRole, hasScope, scopes, roles} = useCheckScope()
 import {onMounted} from "vue"
 
 const props = defineProps({
@@ -86,7 +86,7 @@ const menuOptions = [
         ),
         key: 'Mis',
         icon: renderIcon(IconDatabaseEdit),
-        show: true
+        show: (hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN))
     },
     {
         label: () => h(
