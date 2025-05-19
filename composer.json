@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "ext-bcmath": "*",
         "ext-openssl": "*",
         "http-interop/http-factory-guzzle": "^1.2",
         "inertiajs/inertia-laravel": "^1.0",
@@ -19,9 +20,9 @@
         "maatwebsite/excel": "^3.1",
         "nelexa/zip": "^4.0",
         "predis/predis": "^2.3",
+        "spatie/laravel-data": "^4.15",
         "tightenco/ziggy": "^2.0",
-        "typesense/typesense-php": "^4.9",
-        "ext-bcmath": "*"
+        "typesense/typesense-php": "^4.9"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

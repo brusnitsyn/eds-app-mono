@@ -50,4 +50,26 @@ Route::middleware([
             ]);
         })->name('admin.roles');
     });
+
+    Route::prefix('mis')->group(function () {
+        Route::get('/', [\App\Http\Controllers\MisController::class, 'index'])->name('mis.index');
+
+        Route::prefix('users')->group(function () {
+            Route::get('/', [\App\Http\Controllers\MisController::class, 'users'])->name('mis.users');
+            Route::post('/', [\App\Http\Controllers\MisController::class, 'createUser'])->name('mis.users.create');
+            Route::prefix('{userId}')->group(function () {
+                Route::get('/', [\App\Http\Controllers\MisController::class, 'user'])->name('mis.user');
+                Route::post('/post', [\App\Http\Controllers\MisController::class, 'createPost'])->name('mis.users.post.create');
+                Route::put('/update', [\App\Http\Controllers\MisController::class, 'updateUser'])->name('mis.users.user.update');
+                Route::put('/update-access', [\App\Http\Controllers\MisController::class, 'updateOrCreateAccess'])->name('mis.users.user.access.update');
+                Route::put('/update-post', [\App\Http\Controllers\MisController::class, 'updatePost'])->name('mis.users.user.post.update');
+                Route::put('/update-roles', [\App\Http\Controllers\MisController::class, 'updateRoles'])->name('mis.users.user.roles.update');
+            });
+        });
+
+//        Route::prefix('posts')->group(function () {
+//            Route::get('/', [\App\Http\Controllers\MisController::class, 'posts'])->name('mis.posts');
+//        });
+
+    });
 });

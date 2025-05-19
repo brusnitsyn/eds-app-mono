@@ -8,7 +8,7 @@ import {
     IconUsers,
     IconMenu3,
     IconTable,
-    IconUser
+    IconUser, IconDatabaseEdit
 } from '@tabler/icons-vue'
 import Banner from '@/Components/Banner.vue'
 import {NIcon} from "naive-ui"
@@ -73,6 +73,20 @@ const menuOptions = [
         key: 'Journals',
         icon: renderIcon(IconTable),
         show: hasScope(scopes.CAN_READ_JOURNALS)
+    },
+    {
+        label: () => h(
+            Link,
+            {
+                href: route('mis.index'),
+            },
+            {
+                default: () => 'ТМ:МИС'
+            }
+        ),
+        key: 'Mis',
+        icon: renderIcon(IconDatabaseEdit),
+        show: hasScope(scopes.CAN_ADMIN)
     },
     {
         label: () => h(
