@@ -15,6 +15,7 @@ import {Link, router, useForm} from "@inertiajs/vue3";
 import {useCheckScope} from "@/Composables/useCheckScope.js";
 import {debounce} from "@/Utils/debounce.js";
 import CreateAccountModal from "@/Pages/MIS/Users/Partials/CreateAccountModal.vue";
+import EdsSearchInput from "@/Components/Eds/EdsSearchInput.vue";
 
 const props = defineProps({
     users: Array,
@@ -134,7 +135,7 @@ const columns = [
     //     }
     // }
 ]
-const form = useForm({ valid_type: null, search_field: 'full_name', search_value: null })
+const form = useForm({ search_field: 'full_name', search_value: router.page.props.ziggy.query.search_value })
 const paginationReactive = ref({
     page: props.users.current_page,
     pageSize: props.users.per_page,
@@ -148,11 +149,10 @@ const paginationReactive = ref({
         fetchUsers({ ...router.page.props.ziggy.query, page: 1, page_size: pageSize })
     }
 })
-const searchUserValue = ref(router.page.props.ziggy.query.search_value)
 const hasShowCreateAccountModal = ref(false)
 
 const fetchUsers = (query) => {
-    router.get('/mis/users', { ...query }, {
+    router.get(route('mis.users'), { ...query }, {
         preserveState: true,
         onSuccess: () => {
             paginationReactive.value = {
@@ -166,7 +166,7 @@ const fetchUsers = (query) => {
 }
 
 function searchUser() {
-    form.get('/users', {
+    form.get(route('mis.users'), {
         preserveState: true,
         onSuccess: () => {
             paginationReactive.value = {
@@ -179,14 +179,13 @@ function searchUser() {
     })
 }
 
-const debounceSearchUserValue = computed({
+const searchValue = computed({
     get() {
-        return searchUserValue.value
+        return form.search_value
     },
     set(value) {
-        searchUserValue.value = value
         form.search_value = value
-        debounce(searchUser, 600)
+        searchUser()
     }
 })
 
@@ -196,15 +195,7 @@ const debounceSearchUserValue = computed({
     <AppLayout>
         <template #subheader>
             <NSpace vertical>
-                <NInputGroup class="max-w-xl">
-<!--                                        <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />-->
-                    <NInput ref="searchInputRef" v-model:value="debounceSearchUserValue" autofocus size="large" placeholder="ФИО / СНИЛС / ИНН" @keydown.enter.prevent="searchUser" :loading="form.processing" />
-                    <NButton :loading="form.processing" size="large" @click="searchUser">
-                        <template #icon>
-                            <NIcon :component="IconSearch" />
-                        </template>
-                    </NButton>
-                </NInputGroup>
+                <EdsSearchInput v-model:search="searchValue" placeholder="ФИО" />
             </NSpace>
         </template>
         <template #headermore>

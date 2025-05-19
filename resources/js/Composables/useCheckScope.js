@@ -17,7 +17,7 @@ export function useCheckScope() {
         if (!props.auth.user)
             return false
 
-        return props.auth.user.role.name === role
+        return props.auth.user.role.slug === role
     }
 
     const scopes = Scopes
