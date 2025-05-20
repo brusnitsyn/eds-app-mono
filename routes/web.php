@@ -64,6 +64,7 @@ Route::middleware([
                 Route::put('/update-access', [\App\Http\Controllers\MisController::class, 'updateOrCreateAccess'])->name('mis.users.user.access.update');
                 Route::put('/update-post', [\App\Http\Controllers\MisController::class, 'updatePost'])->name('mis.users.user.post.update');
                 Route::put('/update-roles', [\App\Http\Controllers\MisController::class, 'updateRoles'])->name('mis.users.user.roles.update');
+                Route::post('/change-password', [\App\Http\Controllers\MisController::class, 'changePassword'])->name('mis.users.password.change');
             });
         });
 

@@ -36,6 +36,7 @@ class LpuDoctorData extends Data
         public int $rf_LPUID,
         public int $rf_PRVDID,
         public int $rf_DepartmentID,
+        public bool $has_password_change,
     ) {}
 
     public function toMisData() : array

@@ -60,7 +60,10 @@ const submit = () => {
     form
         .submit('put', route('mis.users.user.roles.update', { userId: props.user.LPUDoctorID }),
             {
-
+                onSuccess: () => {
+                    show.value = false
+                    form.reset()
+                }
             })
 }
 </script>

@@ -25,6 +25,7 @@ import {Link, Head, router, usePage, useForm} from "@inertiajs/vue3";
 import {debounce} from "@/Utils/debounce.js";
 import CreateStaffForm from "@/Pages/Staff/Partials/CreateStaffForm.vue";
 import {useCheckScope} from "@/Composables/useCheckScope.js";
+import EdsSearchInput from "@/Components/Eds/EdsSearchInput.vue";
 
 const { hasScope, scopes } = useCheckScope()
 
@@ -239,20 +240,17 @@ const paginationReactive = ref({
 
 const selectedSearchStaffOption = ref(selectSearchStaffOptions[0].value)
 
-const searchStaffValue = ref(router.page.props.ziggy.query.search_value)
-
-const debounceSearchStaffValue = computed({
+const searchStaffValue = computed({
     get() {
-        return searchStaffValue.value
+        return form.search_value
     },
     set(value) {
-        searchStaffValue.value = value
         form.search_value = value
-        debounce(searchStaff, 600)
+        searchStaff()
     }
 })
 
-const form = useForm({ valid_type: null, search_field: 'full_name', search_value: null })
+const form = useForm({ valid_type: null, search_field: 'full_name', search_value: router.page.props.ziggy.query.search_value })
 
 function searchStaff() {
     form.get('/staff', {
@@ -316,15 +314,16 @@ const onExport = () => {
                         Скачать ({{ checkedRowKeys.length }})
                     </NButton>
                 </NFlex>
-                <NInputGroup class="max-w-xl">
-<!--                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />-->
-                    <NInput ref="searchInputRef" v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="ФИО / СНИЛС / ИНН" @keydown.enter.prevent="searchStaff" :loading="form.processing" />
-                    <NButton :loading="form.processing" size="large" @click="searchStaff">
-                        <template #icon>
-                            <NIcon :component="IconSearch" />
-                        </template>
-                    </NButton>
-                </NInputGroup>
+                <EdsSearchInput v-model:search="searchStaffValue" :loading="form.processing" placeholder="ФИО / СНИЛС / ИНН" @searched="searchStaff" />
+<!--                <NInputGroup class="max-w-xl">-->
+<!--&lt;!&ndash;                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />&ndash;&gt;-->
+<!--                    <NInput ref="searchInputRef" v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="ФИО / СНИЛС / ИНН" @keydown.enter.prevent="searchStaff" :loading="form.processing" />-->
+<!--                    <NButton :loading="form.processing" size="large" @click="searchStaff">-->
+<!--                        <template #icon>-->
+<!--                            <NIcon :component="IconSearch" />-->
+<!--                        </template>-->
+<!--                    </NButton>-->
+<!--                </NInputGroup>-->
             </NSpace>
         </template>
         <template #headermore>

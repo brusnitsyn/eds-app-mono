@@ -5,7 +5,10 @@ import {NInput} from "naive-ui";
 
 const model = defineModel('search')
 const props = defineProps({
-    debounce: Number,
+    debounce: {
+        type: Number,
+        default: 500
+    },
     placeholder: String,
     loading: Boolean,
     size: {

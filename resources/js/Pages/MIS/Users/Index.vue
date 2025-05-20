@@ -13,7 +13,6 @@ import {computed, h, ref} from "vue";
 import {NButton, NDropdown, NFlex, NIcon, NTime} from "naive-ui";
 import {Link, router, useForm} from "@inertiajs/vue3";
 import {useCheckScope} from "@/Composables/useCheckScope.js";
-import {debounce} from "@/Utils/debounce.js";
 import CreateAccountModal from "@/Pages/MIS/Users/Partials/CreateAccountModal.vue";
 import EdsSearchInput from "@/Components/Eds/EdsSearchInput.vue";
 
@@ -195,7 +194,7 @@ const searchValue = computed({
     <AppLayout>
         <template #subheader>
             <NSpace vertical>
-                <EdsSearchInput v-model:search="searchValue" placeholder="ФИО" />
+                <EdsSearchInput v-model:search="searchValue" :debounce="500" @searched="searchUser" :loading="form.processing" placeholder="ФИО" />
             </NSpace>
         </template>
         <template #headermore>
@@ -212,6 +211,7 @@ const searchValue = computed({
                     :data="users.data"
                     min-height="calc(100vh - 416px)"
                     max-height="calc(100vh - 416px)"
+                    :loading="form.processing"
                     :row-key="row => row.id"
         />
         <CreateAccountModal v-model:show="hasShowCreateAccountModal" :prvd="prvd" :prvs="prvs" :departments="departments" :lpus="lpus" :user-edit="null" />

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Data\Mis\LpuDoctorData;
 use App\Data\Mis\XRole;
 use App\Data\Mis\XUserRole;
+use App\Models\MisLPUDoctorToUserID;
+use App\Models\MisPasswordHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -34,10 +36,15 @@ class MisController extends Controller
     public function users(Request $request)
     {
         $pageSize = $request->query('page_size', 25);
+        $searchValue = $request->query('search_value');
+
         $users = DB::connection('mis')
             ->table('hlt_LPUDoctor')
             ->select(['LPUDoctorID', 'PCOD', 'OT_V', 'IM_V', 'FAM_V', 'D_SER', 'DR', 'SS'])
             ->where('LPUDoctorID', '<>', 0)
+            ->when($searchValue, function ($query) use ($searchValue) {
+                $query->whereRaw("CONCAT(FAM_V, ' ', IM_V, ' ', OT_V) LIKE ?", ["$searchValue%"]);
+            })
             ->paginate($pageSize);
 
         return Inertia::render('MIS/Users/Index',
@@ -72,6 +79,10 @@ class MisController extends Controller
             ->where('LPUDoctorID', '=', $userId)
             ->first();
 
+        $xUser = $this->getXUser($userRaw->LPUDoctorID, $userRaw->PCOD);
+
+        $hasPasswordChange = MisPasswordHistory::where('user_id', $xUser->UserID)->exists();
+        $userRaw->has_password_change = $hasPasswordChange;
         $user = LpuDoctorData::from($userRaw);
 
         $jobs = DB::connection('mis')
@@ -107,14 +118,6 @@ class MisController extends Controller
                 'isSpecial' => (bool)$item->isSpecial,
             ];
         });
-
-        $xUser = DB::connection('mis')
-            ->table('x_User')
-            ->select(['UserID', 'GeneralLogin', 'GeneralPassword'])
-            ->join('x_UserSettings', 'x_UserSettings.rf_UserID', '=', 'x_User.UserID')
-            ->where('x_UserSettings.Property', '=', 'Код врача')
-            ->where('x_UserSettings.ValueStr', '=', $user->PCOD)
-            ->first();
 
         return Inertia::render('MIS/Users/Show', [
             'user' => $user,
@@ -409,10 +412,58 @@ class MisController extends Controller
         $hasInsert = DB::connection('mis')
             ->table('x_UserRole')
             ->insert($addRoles);
-
-        dd($hasInsert);
     }
 
+    public function changePassword(int $userId, Request $request)
+    {
+        $userRaw = DB::connection('mis')
+            ->table('hlt_LPUDoctor')
+            ->select(
+                [
+                    'hlt_LPUDoctor.LPUDoctorID', 'hlt_LPUDoctor.PCOD'
+                ]
+            )
+            ->where('LPUDoctorID', '=', $userId)
+            ->first();
+
+        $xUser = $this->getXUser((int) $userRaw->LPUDoctorID, $userRaw->PCOD);
+
+        $passwordChangedCount = MisPasswordHistory::where('user_id', $xUser->UserID)->count();
+
+        if ($passwordChangedCount > 0) {
+            $lastPassword = MisPasswordHistory::where('user_id', $xUser->UserID)->first();
+            if ($lastPassword) {
+                $hasUpdate = DB::connection('mis')
+                    ->table('x_User')
+                    ->where('UserID', '=', $xUser->UserID)
+                    ->update([
+                        'GeneralPassword' => $lastPassword->original_password,
+                    ]);
+
+                if ($hasUpdate) {
+                    $lastPassword->delete();
+                }
+            }
+        } else {
+            $newPassword = $this->computeHash('1234567', $xUser->GUID);
+            $passwordHistory = MisPasswordHistory::create(
+                [
+                    'user_id' => $xUser->UserID,
+                    'original_password' => $xUser->GeneralPassword,
+                    'password' => $newPassword,
+                    'guid' => $xUser->GUID
+                ]
+            );
+            if ($passwordHistory) {
+                DB::connection('mis')
+                    ->table('x_User')
+                    ->where('UserID', '=', $xUser->UserID)
+                    ->update([
+                        'GeneralPassword' => $newPassword,
+                    ]);
+            }
+        }
+    }
 
     private function getDepartments() : Collection
     {
@@ -632,6 +683,38 @@ class MisController extends Controller
         $userRoles = XUserRole::collect($userRoles);
 
         return $userRoles;
+    }
+    private function getXUser(int $lpuDoctorId, string|null $pcod = null)
+    {
+        if (empty($lpuDoctorId))
+            throw new \Error('Не указан PCOD');
+
+        $storedUserID = MisLPUDoctorToUserID::where('lpu_doctor_id', $lpuDoctorId)->first();
+        if ($storedUserID) {
+            $xUser = DB::connection('mis')
+                ->table('x_User')
+                ->select(['UserID', 'GeneralLogin', 'GeneralPassword', 'GUID'])
+                ->where('x_User.UserID', '=', $storedUserID->user_id)
+                ->first();
+        } else {
+            if (empty($pcod))
+                throw new \Error('Не указан PCOD');
+
+            $xUser = DB::connection('mis')
+                ->table('x_User')
+                ->select(['UserID', 'GeneralLogin', 'GeneralPassword', 'GUID'])
+                ->join('x_UserSettings', 'x_UserSettings.rf_UserID', '=', 'x_User.UserID')
+                ->where('x_UserSettings.Property', '=', 'Код врача')
+                ->where('x_UserSettings.ValueStr', '=', $pcod)
+                ->first();
+
+            MisLPUDoctorToUserID::updateOrCreate(['user_id' => $xUser->UserID], [
+                'user_id' => $xUser->UserID,
+                'lpu_doctor_id' => $lpuDoctorId
+            ]);
+        }
+
+        return $xUser;
     }
 
     private function formatedLogin($fam, $ot, $im) : string

@@ -6,7 +6,7 @@ import {
     IconDatabaseSearch,
     IconProgressCheck,
     IconUserCircle,
-    IconEdit, IconCopy, IconPencil, IconPlus, IconLockCog, IconSunglasses
+    IconEdit, IconCopy, IconPencil, IconPlus, IconLockCog, IconSunglasses, IconLockPassword
 } from "@tabler/icons-vue";
 import AppCopyButton from "@/Components/AppCopyButton.vue";
 import {NButton, NIcon, NTooltip} from "naive-ui";
@@ -15,6 +15,7 @@ import EdsIconButton from "@/Components/Eds/EdsIconButton.vue";
 import CreateAccountModal from "@/Pages/MIS/Users/Partials/CreateAccountModal.vue";
 import UpdateAccessModal from "@/Pages/MIS/Users/Partials/UpdateAccessModal.vue";
 import UserRoleModal from "@/Pages/MIS/Users/Partials/UserRoleModal.vue";
+import {router} from "@inertiajs/vue3";
 
 const props = defineProps({
     user: Object,
@@ -51,6 +52,15 @@ const onShowCreatePostModal = () => {
     currentPost.value = null
 }
 
+const changePassword = () => {
+    router
+        .post(route('mis.users.password.change', { userId: props.user.LPUDoctorID }), {}, {
+            onSuccess: () => {
+                window.$message.success('Пароль изменен')
+            }
+        })
+}
+
 watch(() => hasShowCreatePostModal.value, (value) => {
     if (value === false) {
         currentPost.value = null
@@ -60,23 +70,17 @@ watch(() => hasShowCreatePostModal.value, (value) => {
 
 <template>
     <AppLayout :title="fullName">
-        <NGrid :cols="10" :x-gap="16">
+        <NSpace>
+            <NTag v-if="user.has_password_change" type="error">
+                Пароль был изменен
+                <template #icon>
+                    <NIcon :component="IconLockPassword" :size="20" />
+                </template>
+            </NTag>
+        </NSpace>
+        <NGrid :cols="10" :x-gap="16" class="mt-[8px]">
             <NGi span="6">
                 <NSpace vertical>
-                    <NSpace>
-                        <NTag v-if="user.PCOD != null" type="info">
-                            {{ user.PCOD }}
-                            <template #icon>
-                                <NTooltip>
-                                    <template #trigger>
-                                        <NIcon :component="IconDatabaseSearch" :size="20" />
-                                    </template>
-                                    Код врача
-                                </NTooltip>
-                            </template>
-                        </NTag>
-                    </NSpace>
-
                     <NCard title="Общая информация">
                         <template #header-extra>
                             <NSpace align="center" size="large">
@@ -134,6 +138,15 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                         </template>
                         <NList hoverable>
                             <NListItem>
+                                <template v-if="user.PCOD" #suffix>
+                                    <AppCopyButton :value="user.PCOD" />
+                                </template>
+                                <NGrid :cols="2">
+                                    <NGi><NText>Код врача</NText></NGi>
+                                    <NGi><NText>{{ user.PCOD }}</NText></NGi>
+                                </NGrid>
+                            </NListItem>
+                            <NListItem>
                                 <template v-if="user.SS" #suffix>
                                     <AppCopyButton :value="user.SS" />
                                 </template>
@@ -184,7 +197,7 @@ watch(() => hasShowCreatePostModal.value, (value) => {
             </NGi>
 
             <NGi span="4">
-                <NSpace vertical :size="16" class="mt-[37px]">
+                <NSpace vertical :size="16">
                     <NCard title="Доступ">
                         <template #header-extra>
                             <NButton text @click="hasShowUpdateAccessModal = true">
@@ -207,7 +220,7 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                             <NListItem>
                                 <template #suffix>
                                     <NFlex :wrap="false">
-                                        <EdsIconButton :icon="IconLockCog" hint="Подменить пароль" />
+                                        <EdsIconButton :icon="IconLockCog" hint="Подменить пароль" @click="changePassword" />
 <!--                                        <AppCopyButton :value="''" />-->
                                     </NFlex>
                                 </template>
@@ -281,15 +294,18 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                             :prvd="prvd"
                             :prvs="prvs"
                             :departments="departments"
-                            :user-edit="user" />
+                            :user-edit="user"
+        />
         <UpdateAccessModal v-model:show="hasShowUpdateAccessModal"
                            :user="user"
-                           :x-user="x_user" />
+                           :x-user="x_user"
+        />
         <UserRoleModal v-model:show="hasShowUserRoleModal"
                        :user="user"
                        :x-user="x_user"
                        :roles="roles"
-                       :user-roles="user_roles" />
+                       :user-roles="user_roles"
+        />
     </AppLayout>
 </template>
 
