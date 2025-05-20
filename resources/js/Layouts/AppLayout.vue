@@ -21,6 +21,8 @@ import {useCheckScope} from "@/Composables/useCheckScope.js";
 const { t } = useI18n()
 const {hasRole, hasScope, scopes, roles} = useCheckScope()
 import {onMounted} from "vue"
+import {generateBreadcrumbs} from "@/Utils/breadcrumbs.js";
+import EdsBreadcrumbs from "@/Components/Eds/EdsBreadcrumbs.vue";
 
 const props = defineProps({
     title: String,
@@ -56,7 +58,7 @@ const menuOptions = [
                 default: () => 'Персонал'
             }
         ),
-        key: 'Staff',
+        key: 'staff',
         icon: renderIcon(IconUsers),
         show: hasScope(scopes.CAN_READ_STAFF)
     },
@@ -70,7 +72,7 @@ const menuOptions = [
                 default: () => 'Журналы'
             }
         ),
-        key: 'Journals',
+        key: 'journals',
         icon: renderIcon(IconTable),
         show: hasScope(scopes.CAN_READ_JOURNALS)
     },
@@ -84,7 +86,7 @@ const menuOptions = [
                 default: () => 'ТМ:МИС'
             }
         ),
-        key: 'Mis',
+        key: 'mis',
         icon: renderIcon(IconDatabaseEdit),
         show: (hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN))
     },
@@ -98,7 +100,7 @@ const menuOptions = [
                 default: () => 'Администрирование'
             }
         ),
-        key: 'Admin',
+        key: 'admin',
         icon: renderIcon(IconTable),
         show: hasScope(scopes.CAN_ADMIN)
     }
@@ -120,7 +122,8 @@ const userOptions = [
 ]
 
 const currentRoute = computed(() => {
-    return router.page.component.substring(0, router.page.component.indexOf('/'))
+    const route = generateBreadcrumbs(router.page.url)[0].key
+    return route
 })
 
 const user = ref(page.props.auth.user)
@@ -132,25 +135,13 @@ if (!lastUpdate.value || lastUpdate.value !== packageJson.date) {
     showWelcomeDialog.value = true
 }
 
-const breabcrumbs = computed(() => {
-    const pathParts = page?.url?.split('/').filter((part) => part?.trim() !== '');
-    return pathParts?.map((part, partIndex) => {
-        const previousParts = pathParts.slice(0, partIndex);
-        return {
-            label: part,
-            href: previousParts?.length > 0 ? `/${previousParts?.join('/')}/${part}` : `/${part}`,
-            isLast: Boolean(previousParts?.length)
-        }
-    }) || []
-})
+const breabcrumbs = computed(() => generateBreadcrumbs(router.page.url))
 
 const activeTitle = computed(() => {
     if (props.title) {
         return props.title
     }
-
-    const pathParts = page?.props.ziggy.location.split('/').filter((part) => part?.trim() !== '')
-    return t(`pages.${pathParts.pop()}`)
+    return breabcrumbs.value.pop().label
 })
 
 const logout = () => {
@@ -217,15 +208,16 @@ onMounted(() => {
                         <main>
                             <NFlex justify="space-between" align="center" class="mb-5">
                                 <NSpace vertical :size="0">
-                                    <NBreadcrumb v-if="breabcrumbs.length > 1">
-                                        <template v-for="breadcrumb in breabcrumbs" :key="breadcrumb.label">
-                                            <NBreadcrumbItem v-if="!breadcrumb.isLast">
-                                                <Link :href="!breadcrumb.isLast ? breadcrumb.href : ''">
-                                                    {{ t(`pages.${breadcrumb.label}`) }}
-                                                </Link>
-                                            </NBreadcrumbItem>
-                                        </template>
-                                    </NBreadcrumb>
+                                    <EdsBreadcrumbs v-if="breabcrumbs.length > 0" :items="breabcrumbs" />
+<!--                                    <NBreadcrumb v-if="breabcrumbs.length >= 1">-->
+<!--                                        <template v-for="breadcrumb in breabcrumbs" :key="breadcrumb.label">-->
+<!--                                            <NBreadcrumbItem v-if="!breadcrumb.isLast">-->
+<!--                                                <Link :href="!breadcrumb.isLast ? breadcrumb.href : ''">-->
+<!--                                                    {{ breadcrumb.label }}-->
+<!--                                                </Link>-->
+<!--                                            </NBreadcrumbItem>-->
+<!--                                        </template>-->
+<!--                                    </NBreadcrumb>-->
                                     <NFlex align="center" justify="start" :size="6">
 <!--                                        <NButton text>-->
 <!--                                            <template #icon>-->

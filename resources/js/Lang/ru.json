@@ -1,18 +1,17 @@
 {
-    "pages": {
-        "staff": "Персонал",
-        "staff-id": "{person}",
-        "journal": "Журнал",
-        "journals": "Журналы",
-        "patient-falling": "Журнал регистрации падений пациентов и посетителей",
-        "user": "Учетная запись",
-        "profile": "Профиль",
+    "pages.staff": "Персонал",
+    "pages.journal": "Журнал",
+    "pages.journals": "Журналы",
+    "pages.patient-falling": "Журнал регистрации падений пациентов и посетителей",
+    "pages.user": "Учетная запись",
+    "pages.profile": "Профиль",
+    "pages.admin": "Администрирование",
+    "pages.users": "Учетные записи",
+    "pages.roles": "Роли",
+    "pages.mis": "ТМ:МИС",
+    "pages.mis.users": "Учетные записи",
+    "pages.mis.users.show": "Просмотр учетной записи",
 
-        "admin": "Администрирование",
-        "users": "Учетные записи",
-        "roles": "Роли",
-        "mis": "ТМ:МИС"
-    },
     "fallingPatient": {
         "id": "ИД",
         "full_name_patient": "ФИО пациента",
