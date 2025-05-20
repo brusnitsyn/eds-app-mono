@@ -24,7 +24,7 @@ const props = defineProps({
     lpus: Array
 })
 
-const { hasScope, scopes } = useCheckScope()
+const { hasScope, hasRole, scopes, roles } = useCheckScope()
 const rowOptions = [
     {
         label: 'Скачать сертификат',
@@ -198,7 +198,7 @@ const searchValue = computed({
             </NSpace>
         </template>
         <template #headermore>
-            <NButton v-if="hasScope(scopes.CAN_CREATE_STAFF)" type="primary" @click="hasShowCreateAccountModal = true" :disabled="form.processing" :loading="form.processing">
+            <NButton v-if="hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN)" type="primary" @click="hasShowCreateAccountModal = true" :disabled="form.processing" :loading="form.processing">
                 <template #icon>
                     <NIcon :component="IconSquareRoundedPlus" />
                 </template>
