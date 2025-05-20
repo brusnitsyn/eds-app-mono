@@ -22,6 +22,7 @@ class Certification extends Model
         'staff_id',
         'close_key_valid_to',
         'close_key_is_valid',
+        'close_key_is_request_new',
 
         'mis_serial_number',
         'mis_valid_from',
