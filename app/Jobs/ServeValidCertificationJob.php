@@ -34,7 +34,7 @@ class ServeValidCertificationJob implements ShouldQueue
 
                 $certification->update([
                     'is_valid' => $validToData['is_valid'] && $validToCloseKeyData['is_valid'],
-                    'is_request_new' => $validToData['is_request_new'],
+                    'is_request_new' => $validToData['is_request_new'] && $validToCloseKeyData['is_request_new'],
                     'close_key_is_valid' => $validToCloseKeyData['is_valid'],
                     'close_key_is_request_new' => $validToCloseKeyData['is_request_new']
                 ]);
