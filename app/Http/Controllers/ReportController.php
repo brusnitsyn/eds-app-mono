@@ -29,11 +29,9 @@ class ReportController extends Controller
 
         if (!empty($valid_type) && $valid_type == 'new-request') {
             $data = Staff::with(['certification' => function($query) {
-                    $query->latest('created_at')->limit(1);
+                    $query->latest('created_at')->limit(1)
+                        ->where('is_request_new', '=', true);
                 }])
-                ->whereHas('certification', function ($query) {
-                    $query->where('is_request_new', '=', true);
-                })
                 ->get();
 
             $fileName = "ЭРСП - Требующие перевыпуск от $now";
@@ -43,11 +41,9 @@ class ReportController extends Controller
 
         if (!empty($valid_type) && $valid_type == 'no-valid') {
             $data = Staff::with(['certification' => function($query) {
-                $query->latest('created_at')->limit(1);
+                $query->latest('created_at')->limit(1)
+                    ->where('is_request_new', '=', true);
             }])
-                ->whereHas('certification', function ($query) {
-                    $query->where('is_request_new', '=', true);
-                })
                 ->get();
 
             $fileName = "ЭРСП - Недействительные от $now";
