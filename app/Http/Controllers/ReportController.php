@@ -28,11 +28,9 @@ class ReportController extends Controller
 
         if (!empty($valid_type)) {
             if ($valid_type == 'new-request') {
-                $data = Staff::with(['certification' => function($query) {
-                    $query->latest('created_at')->limit(1);
-                }])
-                    ->whereHas('certification', function($query) {
-                        $query->where('is_request_new', true);
+                $data = Staff::whereHas('certification', function($query) {
+                        $query->latest('created_at')->limit(1)
+                            ->where('is_request_new', true);;
                     })
                     ->get();
 
