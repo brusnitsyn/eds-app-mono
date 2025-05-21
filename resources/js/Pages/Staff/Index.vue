@@ -37,10 +37,6 @@ const props = defineProps({
 const searchInputRef = ref()
 const checkedRowKeys = ref([])
 
-onMounted(() => {
-    searchInputRef.value.focus()
-})
-
 const fetchStaff = (query) => {
     router.get('/staff', { ...query }, {
         preserveState: true,

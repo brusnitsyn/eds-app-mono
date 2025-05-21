@@ -19,16 +19,21 @@ const props = defineProps({
 const emits = defineEmits(['searched'])
 
 const searchValue = shallowRef('')
+const searchInputRef = ref()
 const { last } = useDebouncedRefHistory(searchValue, { debounce: props.debounce })
 
 watch(() => last.value, (newSearch) => {
     model.value = newSearch.snapshot
 })
+
+onMounted(() => {
+    searchInputRef.value.focus()
+})
 </script>
 
 <template>
     <NInputGroup class="max-w-xl">
-        <NInput v-model:value="searchValue" autofocus :size="size" :placeholder="placeholder" @keydown.enter.prevent="emits('searched', last)" :loading="loading" />
+        <NInput ref="searchInputRef" v-model:value="searchValue" autofocus :size="size" :placeholder="placeholder" @keydown.enter.prevent="emits('searched', last)" :loading="loading" />
         <NButton :loading="loading" :size="size" @click="emits('searched', last)">
             <template #icon>
                 <NIcon :component="IconSearch" />
