@@ -97,8 +97,8 @@ const columns = [
         ellipsis: {
             tooltip: true
         },
-        sorter: 'default',
-        sortOrder: false,
+        sorter: true,
+        sortOrder: true,
         render(row) {
             return h(
                 NFlex,
@@ -138,7 +138,7 @@ const columns = [
         title: 'СНИЛС',
         key: 'snils',
         width: 120,
-        sorter: 'default',
+        sorter: true,
         sortOrder: false,
     },
     {
@@ -146,7 +146,7 @@ const columns = [
         key: 'certification.valid_to',
         width: 140,
         sortOrder: false,
-        sorter: 'default',
+        sorter: true,
         render(row) {
             return h(
                 NTime,
@@ -161,7 +161,7 @@ const columns = [
         title: 'Должность',
         key: 'job_title',
         sortOrder: false,
-        sorter: 'default',
+        sorter: true,
         ellipsis: {
             tooltip: true
         },
@@ -197,6 +197,7 @@ const columns = [
         }
     }
 ]
+const columnsRef = ref(columns)
 
 const handleFiltersChange = (filters) => {
     const jobTitles = Array.from(filters.job_title)
@@ -270,6 +271,19 @@ const handleCheck = (rowKeys) => {
     checkedRowKeys.value = rowKeys
 }
 
+const handleSorterChange = (sorter) => {
+    const order = sorter.order === false ? 'default' : sorter.order.replace('end', '')
+    router.visit(route('staff.index', { sort_key: sorter.columnKey, sort_order: order }), {
+        preserveState: true,
+        onSuccess: () => {
+            const query = usePage().props.ziggy.query
+            const col = columnsRef.value.find(itm => itm.key === query.sort_key)
+            col.sortOrder = `${query.sort_order}end`
+        }
+    })
+
+}
+
 const onDownloadUrl = computed(() => route('certification.download', {
     staff_ids: checkedRowKeys.value,
 }, true))
@@ -311,15 +325,6 @@ const onExport = () => {
                     </NButton>
                 </NFlex>
                 <EdsSearchInput v-model:search="searchStaffValue" :loading="form.processing" placeholder="ФИО / СНИЛС / ИНН" @searched="searchStaff" />
-<!--                <NInputGroup class="max-w-xl">-->
-<!--&lt;!&ndash;                    <NSelect v-model:value="selectedSearchStaffOption" size="large" :style="{ width: '33%' }" :options="selectSearchStaffOptions" placeholder="Искать по" :disabled="form.processing" :loading="form.processing" />&ndash;&gt;-->
-<!--                    <NInput ref="searchInputRef" v-model:value="debounceSearchStaffValue" autofocus size="large" placeholder="ФИО / СНИЛС / ИНН" @keydown.enter.prevent="searchStaff" :loading="form.processing" />-->
-<!--                    <NButton :loading="form.processing" size="large" @click="searchStaff">-->
-<!--                        <template #icon>-->
-<!--                            <NIcon :component="IconSearch" />-->
-<!--                        </template>-->
-<!--                    </NButton>-->
-<!--                </NInputGroup>-->
             </NSpace>
         </template>
         <template #headermore>
@@ -337,13 +342,14 @@ const onExport = () => {
             </NButton>
         </template>
         <NDataTable remote
-                    :columns="columns"
+                    :columns="columnsRef"
                     :pagination="paginationReactive"
                     :data="staffs.data"
                     min-height="calc(100vh - 416px)"
                     max-height="calc(100vh - 416px)"
                     :loading="form.processing"
                     @update:filters="handleFiltersChange"
+                    @update:sorter="handleSorterChange"
                     :row-key="row => row.id"
                     @update:checked-row-keys="handleCheck"
         />

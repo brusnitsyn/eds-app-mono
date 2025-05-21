@@ -27,6 +27,13 @@ class StaffController extends Controller
         $validType = $request->query('valid_type');
         $page = $request->query('page', 1);
         $pageSize = $request->query('page_size', 25);
+        $sortKey = $request->query('sort_key', 'created_at');
+        $sortOrder = $request->query('sort_order', 'asc');
+
+        if ($sortOrder === 'default') {
+            $sortOrder = 'asc';
+            $sortKey = 'full_name';
+        }
 
         // Определяем, используем ли мы Scout или обычный запрос
         $isScoutSearch = !empty($searchValue);
@@ -45,7 +52,7 @@ class StaffController extends Controller
 
         // Если это Scout-запрос, сначала получаем результаты, затем фильтруем и загружаем отношения
         if ($isScoutSearch) {
-            $staffs = $query->orderBy('created_at')->get();
+            $staffs = $query->orderBy($sortKey, $sortOrder)->get();
 
             // Фильтруем по сертификации, если указан validType
             if (isset($validType)) {
@@ -75,9 +82,29 @@ class StaffController extends Controller
             );
         } else {
             // Если это обычный Eloquent-запрос, используем with и whereHas
-            $query->orderBy('created_at')->with(['certification' => function($query) {
+            $query->with(['certification' => function($query) {
                 $query->latest('created_at')->limit(1);
             }]);
+
+            if (str_contains($sortKey, '.')) {
+                // Сортировка по связанной таблице
+                $parts = explode('.', $sortKey);
+                $relation = $parts[0]; // например 'certification'
+                $field = $parts[1];    // например 'valid_to'
+
+                // Проверяем существование отношения
+                if (method_exists(Staff::class, $relation)) {
+                    $query->with([$relation => function($q) use ($field, $sortOrder) {
+                        $q->orderBy($field, $sortOrder);
+                    }]);
+                } else {
+                    // Отношение не найдено - сортируем по основному полю
+                    $query->orderBy($sortKey, $sortOrder);
+                }
+            } else {
+                // Обычная сортировка по полю основной таблицы
+                $query->orderBy($sortKey, $sortOrder);
+            }
 
             if (isset($validType)) {
                 $query->whereHas('certification', function ($query) use ($validType, $page) {
