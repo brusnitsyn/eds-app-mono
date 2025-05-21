@@ -127,12 +127,13 @@ class ProcessCertificateUpload implements ShouldQueue
                 $patternNew = '/\d{12}Z0/';
                 if (preg_match($patternNew, $closeKeyContent, $matches)) {
                     $dateString = $matches[0];
-                    $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
+                    $closeKeyValidTo = Carbon::createFromFormat('ymdHis\Z', rtrim($dateString, 0), 'UTC')->getTimestampMs();
+//                    $closeKeyValidTo = Carbon::parse($dateTime)->setTimezone(0)->timezone(config('app.timezone'))->getTimestampMs();
                     break; // Если нашли дату, выходим из цикла
                 }
                 if (preg_match($pattern, $closeKeyContent, $matches)) {
                     $dateString = $matches[0];
-                    $closeKeyValidTo = Carbon::parse($dateString)->getTimestampMs();
+                    $closeKeyValidTo = Carbon::parse($dateString)->setTimezone(0)->timezone(config('app.timezone'))->getTimestampMs();
                     break; // Если нашли дату, выходим из цикла
                 }
             } catch (\Exception $e) {
