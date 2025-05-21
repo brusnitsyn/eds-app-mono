@@ -141,7 +141,6 @@ class ProcessCertificateUpload implements ShouldQueue
             }
         }
 
-        Log::info($certificateFile);
         $certContents = file_get_contents($certificateFile);
 
         $certificateCAPemContent = '-----BEGIN CERTIFICATE-----' . PHP_EOL
