@@ -289,7 +289,12 @@ const onDownloadUrl = computed(() => route('certification.download', {
 }, true))
 
 const onExport = () => {
-    window.location.href = route('staff.export');
+    window.location.href = route('staff.export', {
+            _query: {
+                staff_ids: checkedRowKeys.value,
+                valid_type: staffType.value
+            }
+        });
     // router.visit(route('staff.export'), {
     //     headers: {
     //

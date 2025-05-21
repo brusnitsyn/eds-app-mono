@@ -7,13 +7,15 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class StaffExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithEvents
+class StaffExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles, WithEvents, WithColumnFormatting
 {
     protected Collection $data;
 
@@ -52,7 +54,6 @@ class StaffExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             $staff->job_title,
             $staff->inn,
             $staff->snils,
-//            $staff->division ? $staff->division->name : '',
             $staff->certification ? $staff->certification->serial_number : '',
             $staff->certification ? ($staff->certification->is_valid ? 'Да' : 'Нет') : '',
             $staff->certification ? ($staff->certification->valid_from ? Carbon::createFromTimestampMs($staff->certification->valid_from)->format('d.m.Y H:i') : '') : '',
@@ -79,5 +80,13 @@ class StaffExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
     public function registerEvents(): array
     {
         return [];
+    }
+
+    public function columnFormats(): array
+    {
+        return [
+            'D' => NumberFormat::FORMAT_NUMBER,
+            'E' => NumberFormat::FORMAT_NUMBER,
+        ];
     }
 }

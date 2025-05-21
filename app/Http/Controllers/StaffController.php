@@ -27,8 +27,21 @@ class StaffController extends Controller
         $validType = $request->query('valid_type');
         $page = $request->query('page', 1);
         $pageSize = $request->query('page_size', 25);
-        $sortKey = $request->query('sort_key', 'created_at');
-        $sortOrder = $request->query('sort_order', 'asc');
+
+        $sorter = session('staff_sort');
+        $sortKey = $request->query('sort_key', $sorter['key'] ?? 'created_at');
+        $sortOrder = $request->query('sort_order', $sorter['order'] ?? 'asc');
+
+        if ($request->query('sort')
+            || $request->query('sort_order')) {
+            // Сохраняем параметры сортировки в сессию
+            session([
+                'staff_sort' => [
+                    'key' => $sortKey,
+                    'order' => $sortOrder,
+                ]
+            ]);
+        }
 
         if ($sortOrder === 'default') {
             $sortOrder = 'asc';
