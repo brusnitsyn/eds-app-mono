@@ -29,8 +29,7 @@ class ReportController extends Controller
         if (!empty($valid_type)) {
             if ($valid_type == 'new-request') {
                 $data = Staff::with(['certification' => function($query) {
-                    $query->latest('created_at')->limit(1)
-                        ->where('is_request_new', true);
+                    $query->latest('created_at')->limit(1);
                 }])
                     ->whereHas('certification', function($query) {
                         $query->where('is_request_new', true);
@@ -42,8 +41,7 @@ class ReportController extends Controller
             }
             elseif ($valid_type == 'no-valid') {
                 $data = Staff::with(['certification' => function($query) {
-                    $query->latest('created_at')->limit(1)
-                        ->where('is_valid', false);
+                    $query->latest('created_at')->limit(1);
                 }])
                     ->whereHas('certification', function($query) {
                         $query->where('is_valid', false);
