@@ -81,8 +81,13 @@ class MisController extends Controller
 
         $xUser = $this->getXUser($userRaw->LPUDoctorID, $userRaw->PCOD);
 
-        $hasPasswordChange = MisPasswordHistory::where('user_id', $xUser->UserID)->exists();
-        $userRaw->has_password_change = $hasPasswordChange;
+        if (!is_null($xUser)) {
+            $hasPasswordChange = MisPasswordHistory::where('user_id', $xUser->UserID)->exists();
+            $userRaw->has_password_change = $hasPasswordChange;
+        } else {
+            $userRaw->has_password_change = false;
+        }
+
         $user = LpuDoctorData::from($userRaw);
 
         $jobs = DB::connection('mis')
@@ -707,6 +712,8 @@ class MisController extends Controller
                 ->where('x_UserSettings.Property', '=', 'Код врача')
                 ->where('x_UserSettings.ValueStr', '=', $pcod)
                 ->first();
+
+            if (empty($xUser)) $xUser = null;
 
             MisLPUDoctorToUserID::updateOrCreate(['user_id' => $xUser->UserID], [
                 'user_id' => $xUser->UserID,
