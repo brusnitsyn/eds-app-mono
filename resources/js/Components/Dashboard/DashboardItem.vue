@@ -8,7 +8,7 @@ const props = defineProps({
     },
     subtitle: {
         type: [String, Number],
-        default: '999'
+        default: 999,
     },
     href: {
         type: String
@@ -22,10 +22,15 @@ const emits = defineEmits(['clickRefresh', 'clickNavigate'])
 </script>
 
 <template>
-    <NCard :title="title" header-class="!pb-2" footer-class="!p-0">
-        <NP v-if="props.subtitle !== null" class="text-3xl font-medium">
-            {{ props.subtitle }}
-        </NP>
+    <NCard :title="title" header-class="!pb-2" footer-class="!p-0" class="h-full">
+        <div v-if="subtitle !== null">
+            <NP v-if="Number.isInteger(subtitle)" class="text-3xl font-medium">
+                {{ subtitle }}
+            </NP>
+            <NP v-else>
+                {{ subtitle }}
+            </NP>
+        </div>
         <template #footer>
             <slot v-if="$slots.action" name="action" />
             <NFlex v-else :vertical="false" :wrap="false" :size="0" class="-mx-px -mb-px">
