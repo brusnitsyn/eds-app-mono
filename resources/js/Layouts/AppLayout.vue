@@ -122,7 +122,9 @@ const userOptions = [
 ]
 
 const currentRoute = computed(() => {
-    const route = generateBreadcrumbs(router.page.url)[0].key
+    const route = generateBreadcrumbs(router.page.url)
+    if (route.length > 0)
+        return route[0].key
     return route
 })
 
