@@ -714,11 +714,12 @@ class MisController extends Controller
                 ->first();
 
             if (empty($xUser)) $xUser = null;
-
-            MisLPUDoctorToUserID::updateOrCreate(['user_id' => $xUser->UserID], [
-                'user_id' => $xUser->UserID,
-                'lpu_doctor_id' => $lpuDoctorId
-            ]);
+            else {
+                MisLPUDoctorToUserID::updateOrCreate(['user_id' => $xUser->UserID], [
+                    'user_id' => $xUser->UserID,
+                    'lpu_doctor_id' => $lpuDoctorId
+                ]);
+            }
         }
 
         return $xUser;
