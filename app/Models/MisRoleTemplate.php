@@ -14,7 +14,7 @@ class MisRoleTemplate extends Model
     ];
 
     protected $casts = [
-        'roles' => ArrayObject::class,
+        'roles' => 'array',
     ];
 
     public function createUser(): \Illuminate\Database\Eloquent\Relations\BelongsTo

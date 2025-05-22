@@ -1,17 +1,13 @@
 <script setup>
-import EdsModal from "@/Components/Eds/EdsModal.vue"
-import {useDebouncedRefHistory} from "@vueuse/core";
+import EdsModal from "@/Components/Eds/EdsModal.vue";
+import {IconCheck} from "@tabler/icons-vue";
 import EdsSearchInput from "@/Components/Eds/EdsSearchInput.vue";
-import {IconCheck, IconTemplate} from "@tabler/icons-vue";
 import {useForm} from "@inertiajs/vue3";
-const show = defineModel('show')
 
+const show = defineModel('show')
 const props = defineProps({
-    user: Object,
-    xUser: Object,
-    roles: Array,
-    userRoles: Array,
-    roleTemplates: Array
+    template: Object,
+    roles: Array
 })
 
 const templates = [
@@ -22,17 +18,13 @@ const templates = [
     }
 ]
 const form = useForm({
-    user_id: props.xUser.UserID,
-    roles: [
-        ...props.userRoles.map(item => {
-            return item.role_id
-        })
-    ]
+    roles: []
 })
+
+console.log(props.roles)
 const filteredRoles = ref([
     ...props.roles
 ])
-const onlySelectedRoles = ref(false)
 
 const _search = ref('')
 const search = computed({
@@ -40,16 +32,17 @@ const search = computed({
         return _search.value
     },
     set(value) {
+        console.log(value)
         _search.value = value
         if (value === '') filteredRoles.value = props.roles
-        filteredRoles.value = filteredRoles.value.filter(item => {
-            return item.name.toLowerCase().match(value.toLowerCase())
+        filteredRoles.value = props.roles.filter(item => {
+            return item.Name.toLowerCase().match(value.toLowerCase())
         })
     }
 })
 
 const handleSelectRole = (key) => {
-    const template = props.roleTemplates.find(itm => itm.id === key)
+    const template = templates.find(itm => itm.label === key)
     const roles = template.roles
     form.roles = roles.filter(itm => {
         return props.roles.find(i => i.role_id === itm)
@@ -58,7 +51,7 @@ const handleSelectRole = (key) => {
 
 const submit = () => {
     form
-        .submit('put', route('mis.users.user.roles.update', { userId: props.user.LPUDoctorID }),
+        .submit('put', route('mis.templates.roles.update', { template: props.template.id }),
             {
                 onSuccess: () => {
                     show.value = false
@@ -67,13 +60,17 @@ const submit = () => {
             })
 }
 
-const onAfterLeave = () => {
-    form.reset()
+const onAfterEnter = () => {
+    const roles = props.template.roles.map(item => {
+        return item.RoleID
+    })
+
+    form.roles = roles
 }
 </script>
 
 <template>
-    <EdsModal v-model:show="show" class="h-[742px]" title="Роли пользователя" @after-leave="onAfterLeave">
+    <EdsModal v-model:show="show" title="Редактирование шаблона" class="h-[742px]" @after-enter="onAfterEnter">
         <NFlex vertical justify="space-between" class="h-full">
             <NSpace vertical>
                 <NGrid :cols="5">
@@ -85,25 +82,12 @@ const onAfterLeave = () => {
                                         size="medium"
                                         class="w-full" />
                     </NGi>
-                    <NGi :span="2">
-                        <NSpace align="center" justify="end">
-                            <NCheckbox v-model:checked="onlySelectedRoles" />
-                            <NDropdown trigger="hover" :options="roleTemplates" label-field="name" key-field="id" placement="bottom-end" @select="handleSelectRole">
-                                <NButton secondary type="primary">
-                                    <template #icon>
-                                        <NIcon :component="IconTemplate" />
-                                    </template>
-                                    Шаблоны
-                                </NButton>
-                            </NDropdown>
-                        </NSpace>
-                    </NGi>
                 </NGrid>
                 <NScrollbar class="h-[560px] overflow-hidden relative">
                     <NForm>
                         <NCheckboxGroup v-if="filteredRoles.length > 0" v-model:value="form.roles">
                             <NSpace vertical>
-                                <NCheckbox v-for="role in filteredRoles" :value="role.role_id" :label="role.name" />
+                                <NCheckbox v-for="role in filteredRoles" :value="role.RoleID" :label="role.Name" />
                             </NSpace>
                         </NCheckboxGroup>
                         <div v-else class="absolute inset-0 flex items-center justify-center">

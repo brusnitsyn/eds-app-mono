@@ -29,6 +29,7 @@ const props = defineProps({
     department_profiles: Array,
     roles: Array,
     user_roles: Array,
+    role_templates: Array,
 })
 const fullName = computed(() => `${props.user.FAM_V} ${props.user.IM_V} ${props.user.OT_V}`)
 const hasShowCreatePostModal = ref(false)
@@ -305,6 +306,7 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                        :x-user="x_user"
                        :roles="roles"
                        :user-roles="user_roles"
+                       :role-templates="role_templates"
         />
     </AppLayout>
 </template>

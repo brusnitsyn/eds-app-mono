@@ -14,6 +14,9 @@ const props = defineProps({
                 <NGi>
                     <DashboardItem :href="route('mis.users')" title="Учетные записи" :subtitle="usersCount" refresh-hidden />
                 </NGi>
+                <NGi>
+                    <DashboardItem :href="route('mis.templates.roles')" title="Шаблоны ролей" subtitle="Управление шаблонами" refresh-hidden />
+                </NGi>
             </NGrid>
         </div>
     </AppLayout>

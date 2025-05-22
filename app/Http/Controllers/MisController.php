@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Data\Mis\LpuDoctorData;
 use App\Data\Mis\XRole;
 use App\Data\Mis\XUserRole;
+use App\Facades\MisDoctor;
+use App\Facades\MisXUser;
 use App\Models\MisLPUDoctorToUserID;
 use App\Models\MisPasswordHistory;
+use App\Models\MisRoleTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -35,17 +38,10 @@ class MisController extends Controller
 
     public function users(Request $request)
     {
-        $pageSize = $request->query('page_size', 25);
         $searchValue = $request->query('search_value');
+        $pageSize = $request->query('page_size', 25);
 
-        $users = DB::connection('mis')
-            ->table('hlt_LPUDoctor')
-            ->select(['LPUDoctorID', 'PCOD', 'OT_V', 'IM_V', 'FAM_V', 'D_SER', 'DR', 'SS'])
-            ->where('LPUDoctorID', '<>', 0)
-            ->when($searchValue, function ($query) use ($searchValue) {
-                $query->whereRaw("CONCAT(FAM_V, ' ', IM_V, ' ', OT_V) LIKE ?", ["$searchValue%"]);
-            })
-            ->paginate($pageSize);
+        $users = MisDoctor::getPaginate($searchValue, $pageSize);
 
         return Inertia::render('MIS/Users/Index',
             [
@@ -59,36 +55,8 @@ class MisController extends Controller
 
     public function user(int $userId, Request $request)
     {
-        $userRaw = DB::connection('mis')
-            ->table('hlt_LPUDoctor')
-            ->select(
-                [
-                    'hlt_LPUDoctor.LPUDoctorID', 'hlt_LPUDoctor.PCOD', 'hlt_LPUDoctor.OT_V', 'hlt_LPUDoctor.IM_V',
-                    'hlt_LPUDoctor.FAM_V', 'hlt_LPUDoctor.D_SER', 'hlt_LPUDoctor.DR', 'hlt_LPUDoctor.SS',
-                    'hlt_LPUDoctor.isDoctor', 'hlt_LPUDoctor.inTime', 'hlt_LPUDoctor.isSpecial', 'hlt_LPUDoctor.isDismissal',
-                    'oms_PRVS.C_PRVS', 'oms_PRVS.PRVS_NAME', 'oms_PRVS.Date_Beg', 'oms_PRVS.Date_End',
-                    'oms_LPU.M_NAMES', 'oms_Department.DepartmentName',
-                    'oms_PRVD.NAME', 'hlt_LPUDoctor.rf_PRVSID', 'hlt_LPUDoctor.rf_LPUID', 'hlt_LPUDoctor.rf_PRVDID',
-                    'hlt_LPUDoctor.rf_DepartmentID'
-                ]
-            )
-            ->join('oms_PRVS', 'hlt_LPUDoctor.rf_PRVSID', '=', 'oms_PRVS.PRVSID')
-            ->join('oms_LPU', 'hlt_LPUDoctor.rf_LPUID', '=', 'oms_LPU.LPUID')
-            ->join('oms_Department', 'hlt_LPUDoctor.rf_DepartmentID', '=', 'oms_Department.DepartmentID')
-            ->join('oms_PRVD', 'hlt_LPUDoctor.rf_PRVDID', '=', 'oms_PRVD.PRVDID')
-            ->where('LPUDoctorID', '=', $userId)
-            ->first();
-
-        $xUser = $this->getXUser($userRaw->LPUDoctorID, $userRaw->PCOD);
-
-        if (!is_null($xUser)) {
-            $hasPasswordChange = MisPasswordHistory::where('user_id', $xUser->UserID)->exists();
-            $userRaw->has_password_change = $hasPasswordChange;
-        } else {
-            $userRaw->has_password_change = false;
-        }
-
-        $user = LpuDoctorData::from($userRaw);
+        $user = MisDoctor::getDoctorById($userId);
+        $xUser = MisXUser::getUserByDoctorId($userId);
 
         $jobs = DB::connection('mis')
             ->table('hlt_DocPRVD')
@@ -124,6 +92,8 @@ class MisController extends Controller
             ];
         });
 
+        $templates = MisRoleTemplate::with(['createUser'])->get();
+
         return Inertia::render('MIS/Users/Show', [
             'user' => $user,
             'x_user' => $xUser,
@@ -135,7 +105,8 @@ class MisController extends Controller
             'department_types' => $this->getDepartmentType(),
             'department_profiles' => $this->getDepartmentProfiles(),
             'roles' => $this->getRoles(),
-            'user_roles' => empty($xUser) ? [] : $this->getRolesByUserId($xUser->UserID)
+            'user_roles' => empty($xUser) ? [] : $this->getRolesByUserId($xUser->UserID),
+            'role_templates' => $templates
         ]);
     }
 
@@ -328,11 +299,15 @@ class MisController extends Controller
         $params = DB::connection('mis')
             ->table('x_UserSettings')
             ->select(['rf_UserID'])
-            ->where('Property', 'like', 'Код врача')
+            ->where('Property', '=', 'Код врача')
             ->where('ValueStr', '=', $doctor->PCOD)
             ->first();
 
-        $userId = (int)$params->rf_UserID;
+        if (empty($params)) {
+            $userId = null;
+        } else {
+            $userId = (int)$params->rf_UserID;
+        }
 
         $user = DB::connection('mis')
             ->table('x_User')
@@ -468,6 +443,69 @@ class MisController extends Controller
                     ]);
             }
         }
+    }
+
+    public function roles()
+    {
+        $templates = MisRoleTemplate::with(['createUser'])->get();
+        $misRolesCache = Cache::get('mis_roles', [])->map(function ($item) {
+            return [
+                'RoleID' => (int)$item->RoleID,
+                'Name' => $item->Name
+            ];
+        });
+
+        if (!empty($misRolesCache)) {
+            $templates = $templates->map(function ($template) use ($misRolesCache) {
+                $roles = collect($template->roles)->map(function ($role) use ($misRolesCache) {
+                    $matchingRole = $misRolesCache->firstWhere('RoleID', (string)$role);
+
+                    return [
+                        'RoleID' => $role,
+                        'Name' => $matchingRole ? $matchingRole['Name'] : '',
+                    ];
+                });
+
+                return [
+                    ...$template->toArray(),
+                    'roles' => $roles
+                ];
+            });
+        }
+
+        return Inertia::render('MIS/Roles/Index', [
+            'templates' => $templates,
+            'roles' => $misRolesCache
+        ]);
+    }
+
+    public function createTemplate(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string'],
+            'roles' => ['required', 'array'],
+        ]);
+
+        $userId = $request->user()->id;
+
+        MisRoleTemplate::create([
+            'name' => $data['name'],
+            'roles' => $data['roles'],
+            'create_user_id' => $userId
+        ]);
+
+        return redirect(route('mis.templates.roles'));
+    }
+
+    public function updateTemplate(MisRoleTemplate $template, Request $request)
+    {
+        $data = $request->validate([
+            'roles' => ['required', 'array'],
+        ]);
+
+        $template->update($data);
+
+        return redirect(route('mis.templates.roles'));
     }
 
     private function getDepartments() : Collection

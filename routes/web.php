@@ -68,6 +68,12 @@ Route::middleware([
             });
         });
 
+        Route::prefix('templates')->group(function () {
+            Route::get('/', [\App\Http\Controllers\MisController::class, 'roles'])->name('mis.templates.roles');
+            Route::post('/', [\App\Http\Controllers\MisController::class, 'createTemplate'])->name('mis.templates.roles.create');
+            Route::put('{template}', [\App\Http\Controllers\MisController::class, 'updateTemplate'])->name('mis.templates.roles.update');
+        });
+
 //        Route::prefix('posts')->group(function () {
 //            Route::get('/', [\App\Http\Controllers\MisController::class, 'posts'])->name('mis.posts');
 //        });
