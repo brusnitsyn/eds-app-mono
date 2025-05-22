@@ -135,7 +135,7 @@ class MisController extends Controller
             'department_types' => $this->getDepartmentType(),
             'department_profiles' => $this->getDepartmentProfiles(),
             'roles' => $this->getRoles(),
-            'user_roles' => $this->getRolesByUserId($xUser->UserID)
+            'user_roles' => empty($xUser) ? [] : $this->getRolesByUserId($xUser->UserID)
         ]);
     }
 
