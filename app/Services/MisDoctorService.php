@@ -119,7 +119,7 @@ class MisDoctorService
         $builder = $this->getBaseBuilder(null, $selects, $wheres);
 
         if (!empty($searchValue)) {
-            if (is_int(intval($searchValue))) {
+            if (intval($searchValue) != 0) {
                 $builder->when($searchValue, function ($query) use ($searchValue) {
                     $query->where("PCOD", 'like', "$searchValue%");
                 });
