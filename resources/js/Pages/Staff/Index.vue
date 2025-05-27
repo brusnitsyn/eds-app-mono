@@ -142,7 +142,7 @@ const columns = [
         sortOrder: false,
     },
     {
-        title: 'Действует до',
+        title: 'Ключ до',
         key: 'certification.valid_to',
         width: 140,
         sortOrder: false,
@@ -153,6 +153,22 @@ const columns = [
                 {
                     format: 'dd.MM.yyyy',
                     time: Number(row.certification.valid_to)
+                }
+            )
+        }
+    },
+    {
+        title: 'Контейнер до',
+        key: 'certification.close_key_valid_to',
+        width: 140,
+        sortOrder: false,
+        sorter: true,
+        render(row) {
+            return h(
+                NTime,
+                {
+                    format: 'dd.MM.yyyy',
+                    time: Number(row.certification.close_key_valid_to)
                 }
             )
         }
