@@ -207,10 +207,12 @@ return [
                          [
                              'name' => 'full_name',
                              'type' => 'string',
+                             'sort' => true
                          ],
                          [
                              'name' => 'job_title',
                              'type' => 'string',
+                             'sort' => true
                          ],
                          [
                              'name' => 'inn',
@@ -219,6 +221,7 @@ return [
                          [
                              'name' => 'snils',
                              'type' => 'string',
+                             'sort' => true
                          ],
                          [
                              'name' => 'created_at',
