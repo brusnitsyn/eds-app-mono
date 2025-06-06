@@ -108,7 +108,7 @@ class StaffController extends Controller
                 // Проверяем существование отношения
                 if (method_exists(Staff::class, $relation)) {
                     $query->with([$relation => function($q) use ($field, $sortOrder) {
-                        $q->orderBy($field, $sortOrder);
+                        $q->latest()->orderBy($field, $sortOrder);
                     }]);
                 } else {
                     // Отношение не найдено - сортируем по основному полю
