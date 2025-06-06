@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Events\CertificationCreated;
 use App\Events\CertificationUpdated;
 use App\Models\Certification;
+use Illuminate\Support\Facades\Storage;
 
 class CertificationObserver
 {
@@ -29,7 +30,10 @@ class CertificationObserver
      */
     public function deleted(Certification $certification): void
     {
-        //
+        $path = $certification->path_certification;
+        if (Storage::disk('certification')->exists($path)) {
+            Storage::disk('certification')->delete($path);
+        }
     }
 
     /**
