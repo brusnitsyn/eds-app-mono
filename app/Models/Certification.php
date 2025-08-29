@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Observers\CertificationObserver;
 use App\Traits\MisTrait;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
+#[ObservedBy(CertificationObserver::class)]
 class Certification extends Model
 {
     use HasFactory, MisTrait;

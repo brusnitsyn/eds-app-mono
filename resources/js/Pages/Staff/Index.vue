@@ -289,7 +289,7 @@ const handleCheck = (rowKeys) => {
 
 const handleSorterChange = (sorter) => {
     const order = sorter.order === false ? 'default' : sorter.order.replace('end', '')
-    router.visit(route('staff.index', { sort_key: sorter.columnKey, sort_order: order }), {
+    router.visit(route('staff.index', { ...router.page.props.ziggy.query, sort_key: sorter.columnKey, sort_order: order }), {
         preserveState: true,
         onSuccess: () => {
             const query = usePage().props.ziggy.query

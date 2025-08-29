@@ -36,7 +36,9 @@ class CreateNewStaff
         $data['gender'] = 'slava';
 
         $staff = Staff::updateOrCreate(['inn' => $data['inn']], $data);
-        $staff->certification()->updateOrCreate($certification);
+        if ($staff->certification()->exists()) $staff->certification->delete();
+        $staff->certification()->create($certification);
+        $staff->searchable();
 
         return $staff;
     }

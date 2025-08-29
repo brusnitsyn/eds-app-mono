@@ -215,6 +215,16 @@ return [
                              'sort' => true
                          ],
                          [
+                             'name' => 'certification.valid_to',
+                             'type' => 'int64',
+                             "optional" => true,
+                         ],
+                         [
+                             'name' => 'certification.close_key_valid_to',
+                             'type' => 'int64',
+                             "optional" => true,
+                         ],
+                         [
                              'name' => 'inn',
                              'type' => 'string',
                          ],
