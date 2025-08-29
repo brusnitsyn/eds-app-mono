@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static XUserMis|null getUserById(int $userId)
  * @method static XUserMis|null getUserByDoctorId(int $doctorId)
  * @method static XUserMis|null getUserByDoctorPcod(string $doctorPcod)
+ * @method static string formatedLogin($fam, $ot, $im)
  *
  * @see \App\Services\MisXUserService
  */

@@ -15,6 +15,7 @@ import {Link, router, useForm} from "@inertiajs/vue3";
 import {useCheckScope} from "@/Composables/useCheckScope.js";
 import CreateAccountModal from "@/Pages/MIS/Users/Partials/CreateAccountModal.vue";
 import EdsSearchInput from "@/Components/Eds/EdsSearchInput.vue";
+import ImportAccoutModal from "@/Pages/MIS/Users/Partials/ImportAccoutModal.vue";
 
 const props = defineProps({
     users: Array,
@@ -60,12 +61,12 @@ const columns = [
     },
     {
         title: 'ID',
-        key: 'LPUDoctorID',
+        key: 'id',
         width: 50,
     },
     {
         title: 'Код',
-        key: 'PCOD',
+        key: 'code',
         width: 50,
     },
     {
@@ -79,29 +80,29 @@ const columns = [
             return h(
                 Link,
                 {
-                    href: route('mis.user', { userId: row.LPUDoctorID }),
+                    href: route('mis.user', { userId: row.id }),
                 },
                 {
-                    default: () => `${row.FAM_V} ${row.IM_V} ${row.OT_V}`
+                    default: () => `${row.last_name} ${row.first_name} ${row.middle_name}`
                 }
             )
         }
     },
     {
         title: 'СНИЛС',
-        key: 'SS',
+        key: 'snils',
         width: 120,
     },
     {
         title: 'Дата рождения',
-        key: 'DR',
+        key: 'brith_at',
         width: 140,
         render(row) {
             return h(
                 NTime,
                 {
                     format: 'dd.MM.yyyy',
-                    time: row.DR
+                    time: row.brith_at
                 }
             )
         }
@@ -149,6 +150,7 @@ const paginationReactive = ref({
     }
 })
 const hasShowCreateAccountModal = ref(false)
+const hasShowImportAccountModal = ref(false)
 
 const fetchUsers = (query) => {
     router.get(route('mis.users'), { ...query }, {
@@ -198,12 +200,20 @@ const searchValue = computed({
             </NSpace>
         </template>
         <template #headermore>
-            <NButton v-if="hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN)" type="primary" @click="hasShowCreateAccountModal = true" :disabled="form.processing" :loading="form.processing">
-                <template #icon>
-                    <NIcon :component="IconSquareRoundedPlus" />
-                </template>
-                Добавить учетную запись
-            </NButton>
+            <NSpace>
+<!--                <NButton v-if="hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN)" secondary type="primary" @click="hasShowImportAccountModal = true" :disabled="form.processing" :loading="form.processing">-->
+<!--                    <template #icon>-->
+<!--                        <NIcon :component="IconSquareRoundedPlus" />-->
+<!--                    </template>-->
+<!--                    Импортировать-->
+<!--                </NButton>-->
+                <NButton v-if="hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN)" type="primary" @click="hasShowCreateAccountModal = true" :disabled="form.processing" :loading="form.processing">
+                    <template #icon>
+                        <NIcon :component="IconSquareRoundedPlus" />
+                    </template>
+                    Добавить учетную запись
+                </NButton>
+            </NSpace>
         </template>
         <NDataTable remote
                     :columns="columns"
@@ -215,6 +225,7 @@ const searchValue = computed({
                     :row-key="row => row.id"
         />
         <CreateAccountModal v-model:show="hasShowCreateAccountModal" :prvd="prvd" :prvs="prvs" :departments="departments" :lpus="lpus" :user-edit="null" />
+        <ImportAccoutModal v-model:show="hasShowImportAccountModal" />
     </AppLayout>
 </template>
 

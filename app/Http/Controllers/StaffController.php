@@ -55,7 +55,8 @@ class StaffController extends Controller
         $query = $isScoutSearch ? Staff::search($searchValue)->options([
             'num_typos' => 1,
             'prioritize_exact_match' => true,
-            'pre_segmented_query' => true
+            'pre_segmented_query' => true,
+            'sort_by' => "$sortKey:$sortOrder",
         ]) : Staff::query();
 
         // Применяем фильтр по должности
@@ -65,7 +66,7 @@ class StaffController extends Controller
 
         // Если это Scout-запрос, сначала получаем результаты, затем фильтруем и загружаем отношения
         if ($isScoutSearch) {
-            $staffs = $query->orderBy($sortKey, $sortOrder)->get();
+            $staffs = $query->get();
 
             // Фильтруем по сертификации, если указан validType
             if (isset($validType)) {

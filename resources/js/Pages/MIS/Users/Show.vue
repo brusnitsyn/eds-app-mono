@@ -19,6 +19,7 @@ import {router} from "@inertiajs/vue3";
 
 const props = defineProps({
     user: Object,
+    staff: Object,
     x_user: Object,
     jobs: Array,
     departments: Array,
@@ -31,7 +32,7 @@ const props = defineProps({
     user_roles: Array,
     role_templates: Array,
 })
-const fullName = computed(() => `${props.user.FAM_V} ${props.user.IM_V} ${props.user.OT_V}`)
+const fullName = computed(() => `${props.user.last_name} ${props.user.first_name} ${props.user.middle_name}`)
 const hasShowCreatePostModal = ref(false)
 const hasShowEditAccountModal = ref(false)
 const hasShowUpdateAccessModal = ref(false)
@@ -71,6 +72,11 @@ watch(() => hasShowCreatePostModal.value, (value) => {
 
 <template>
     <AppLayout :title="fullName">
+        <template #headermore>
+            <NButton v-if="staff" type="primary" @click="router.get(route('staff.show', { staff: staff.id }))">
+                Перейти к сертификату
+            </NButton>
+        </template>
         <NSpace>
             <NTag v-if="user.has_password_change" type="error">
                 Пароль был изменен
@@ -86,7 +92,7 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                         <template #header-extra>
                             <NSpace align="center" size="large">
                                 <NSpace align="center" size="small">
-                                    <NTooltip v-if="user.isSpecial">
+                                    <NTooltip v-if="user.is_special">
                                         <template #trigger>
                                             <NEl class="px-1.5 rounded text-[var(--base-color)] bg-[var(--primary-color)] font-medium cursor-default">
                                                 С
@@ -94,7 +100,7 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                                         </template>
                                         Узкий специалист
                                     </NTooltip>
-                                    <NTooltip v-if="user.isDoctor">
+                                    <NTooltip v-if="user.is_doctor">
                                         <template #trigger>
                                             <NEl class="px-1.5 rounded text-[var(--base-color)] bg-[var(--primary-color)] font-medium cursor-default">
                                                 В
@@ -102,7 +108,7 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                                         </template>
                                         Сотрудник является врачом
                                     </NTooltip>
-                                    <NTooltip v-if="user.inTime">
+                                    <NTooltip v-if="user.in_time">
                                         <template #trigger>
                                             <NEl class="px-1.5 rounded text-[var(--base-color)] bg-[var(--primary-color)] font-medium cursor-default">
                                                 Р
@@ -110,7 +116,7 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                                         </template>
                                         Доступен в расписании
                                     </NTooltip>
-                                    <NTooltip v-if="user.isDismissal">
+                                    <NTooltip v-if="user.is_dismissal">
                                         <template #trigger>
                                             <NEl class="px-1.5 rounded text-[var(--base-color)] bg-[var(--error-color)] font-medium cursor-default">
                                                 У
@@ -139,57 +145,57 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                         </template>
                         <NList hoverable>
                             <NListItem>
-                                <template v-if="user.PCOD" #suffix>
-                                    <AppCopyButton :value="user.PCOD" />
+                                <template v-if="user.code" #suffix>
+                                    <AppCopyButton :value="user.code" />
                                 </template>
                                 <NGrid :cols="2">
                                     <NGi><NText>Код врача</NText></NGi>
-                                    <NGi><NText>{{ user.PCOD }}</NText></NGi>
+                                    <NGi><NText>{{ user.code }}</NText></NGi>
                                 </NGrid>
                             </NListItem>
                             <NListItem>
-                                <template v-if="user.SS" #suffix>
-                                    <AppCopyButton :value="user.SS" />
+                                <template v-if="user.snils" #suffix>
+                                    <AppCopyButton :value="user.snils" />
                                 </template>
                                 <NGrid :cols="2">
                                     <NGi><NText>СНИЛС</NText></NGi>
-                                    <NGi><NText>{{ user.SS }}</NText></NGi>
+                                    <NGi><NText>{{ user.snils }}</NText></NGi>
                                 </NGrid>
                             </NListItem>
                             <NListItem>
-                                <template v-if="user.M_NAMES" #suffix>
-                                    <AppCopyButton :value="user.M_NAMES" />
+                                <template v-if="user.lpu_name" #suffix>
+                                    <AppCopyButton :value="user.lpu_name" />
                                 </template>
                                 <NGrid :cols="2">
                                     <NGi><NText>ЛПУ</NText></NGi>
-                                    <NGi><NText>{{ user.M_NAMES }}</NText></NGi>
+                                    <NGi><NText>{{ user.lpu_name }}</NText></NGi>
                                 </NGrid>
                             </NListItem>
                             <NListItem>
-                                <template v-if="user.DepartmentName" #suffix>
-                                    <AppCopyButton :value="user.DepartmentName" />
+                                <template v-if="user.department_name" #suffix>
+                                    <AppCopyButton :value="user.department_name" />
                                 </template>
                                 <NGrid :cols="2">
                                     <NGi><NText>Отделение</NText></NGi>
-                                    <NGi><NText>{{ user.DepartmentName }}</NText></NGi>
+                                    <NGi><NText>{{ user.department_name }}</NText></NGi>
                                 </NGrid>
                             </NListItem>
                             <NListItem>
-                                <template v-if="user.PRVS_NAME" #suffix>
-                                    <AppCopyButton :value="user.PRVS_NAME" />
+                                <template v-if="user.prvs_name" #suffix>
+                                    <AppCopyButton :value="user.prvs_name" />
                                 </template>
                                 <NGrid :cols="2">
                                     <NGi><NText>Специальность</NText></NGi>
-                                    <NGi><NText>{{ user.PRVS_NAME }}</NText></NGi>
+                                    <NGi><NText>{{ user.prvs_name }}</NText></NGi>
                                 </NGrid>
                             </NListItem>
                             <NListItem>
-                                <template v-if="user.NAME" #suffix>
-                                    <AppCopyButton :value="user.NAME" />
+                                <template v-if="user.prvd_name" #suffix>
+                                    <AppCopyButton :value="user.prvd_name" />
                                 </template>
                                 <NGrid :cols="2">
                                     <NGi><NText>Должность</NText></NGi>
-                                    <NGi><NText>{{ user.NAME }}</NText></NGi>
+                                    <NGi><NText>{{ user.prvd_name }}</NText></NGi>
                                 </NGrid>
                             </NListItem>
                         </NList>
@@ -258,15 +264,15 @@ watch(() => hasShowCreatePostModal.value, (value) => {
                                     </NFlex>
                                 </template>
                                 <NGrid :cols="6">
-                                    <NGi><NText>{{ job.PCOD === '' ? 'Нет кода' : job.PCOD }}</NText></NGi>
-                                    <NGi span="4"><NText>{{ job.NAME }}</NText></NGi>
+                                    <NGi><NText>{{ job.code === '' ? 'Нет кода' : job.code }}</NText></NGi>
+                                    <NGi span="4"><NText>{{ job.name }}</NText></NGi>
                                     <NGi class="inline-flex">
-                                        <NTag v-if="job.MainWorkPlace"
+                                        <NTag v-if="job.main_work_place"
                                               size="small"
                                               type="success">
                                             Основная
                                         </NTag>
-                                        <NTag v-if="job.isDismissal"
+                                        <NTag v-if="job.is_dismissal"
                                               size="small"
                                               type="error">
                                             Увольнение

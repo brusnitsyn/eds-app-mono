@@ -2,14 +2,27 @@
 
 namespace App\Http\Controllers;
 
+use App\Data\Mis\Classifier\ClassifierDepartmentData;
+use App\Data\Mis\Classifier\ClassifierDepartmentProfileData;
+use App\Data\Mis\Classifier\ClassifierDepartmentTypeData;
+use App\Data\Mis\Classifier\ClassifierLpuData;
+use App\Data\Mis\Classifier\ClassifierPrvdData;
+use App\Data\Mis\Classifier\ClassifierPrvsData;
+use App\Data\Mis\DoctorData;
+use App\Data\Mis\InsertPRVDDoctorData;
 use App\Data\Mis\LpuDoctorData;
+use App\Data\Mis\PrvdData;
 use App\Data\Mis\XRole;
 use App\Data\Mis\XUserRole;
+use App\Facades\MisClassifier;
 use App\Facades\MisDoctor;
+use App\Facades\MisImport;
 use App\Facades\MisXUser;
 use App\Models\MisLPUDoctorToUserID;
 use App\Models\MisPasswordHistory;
 use App\Models\MisRoleTemplate;
+use App\Models\Staff;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -20,6 +33,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Ramsey\Uuid\Uuid;
+use Spatie\LaravelData\Optional;
+use stdClass;
 
 class MisController extends Controller
 {
@@ -27,7 +42,6 @@ class MisController extends Controller
     {
         $usersCount = DB::connection('mis')
             ->table('hlt_LPUDoctor')
-            ->select(['LPUDoctorID', 'PCOD', 'OT_V', 'IM_V', 'FAM_V', 'D_SER', 'DR', 'SS'])
             ->where('LPUDoctorID', '<>', 0)
             ->count();
 
@@ -46,241 +60,201 @@ class MisController extends Controller
         return Inertia::render('MIS/Users/Index',
             [
                 'users' => $users,
-                'departments' => $this->getDepartments(),
-                'prvd' => $this->getPrvd(),
-                'prvs' => $this->getPrvs(),
-                'lpus' => $this->getLpu(),
+                'lpus' => $this->formattedLpus(),
+                'departments' => $this->formattedDepartments(),
+                'prvd' => $this->formattedPrvd(),
+                'prvs' => $this->formattedPrvs(),
             ]);
     }
 
     public function user(int $userId, Request $request)
     {
-        $user = MisDoctor::getDoctorById($userId);
+        $user = MisDoctor::getDoctorById($userId)->toOriginal();
         $xUser = MisXUser::getUserByDoctorId($userId);
+        $prvds = MisDoctor::getPrvd($userId);
+        $snils = Str::replace('-', '', $user['snils']);
+        $snils = Str::replace(' ', '', $snils);
 
-        $jobs = DB::connection('mis')
-            ->table('hlt_DocPRVD')
-            ->select(
-                [
-                    'hlt_DocPRVD.DocPRVDID', 'hlt_DocPRVD.S_ST', 'hlt_DocPRVD.PCOD', 'oms_PRVD.NAME',
-                    'hlt_DocPRVD.isDismissal', 'hlt_DocPRVD.rf_PRVSID', 'hlt_DocPRVD.rf_DepartmentID',
-                    'hlt_DocPRVD.rf_PRVDID', 'hlt_DocPRVD.rf_kl_DepartmentProfileID', 'hlt_DocPRVD.rf_kl_DepartmentTypeID',
-                    'hlt_DocPRVD.MainWorkPlace', 'hlt_DocPRVD.InTime', 'hlt_DocPRVD.ShownInSchedule', 'hlt_DocPRVD.isSpecial',
-                ]
-            )
-            ->join('oms_PRVD', 'hlt_DocPRVD.rf_PRVDID', '=', 'oms_PRVD.PRVDID')
-            ->where('hlt_DocPRVD.rf_LPUDoctorID', '=', $userId)
-            ->orderBy('hlt_DocPRVD.PCOD')
-            ->get();
-
-        $jobs = $jobs->map(function ($item) {
-            return [
-                'DocPRVDID' => (float)$item->DocPRVDID,
-                'S_ST' => (float)$item->S_ST,
-                'PCOD' => $item->PCOD,
-                'NAME' => $item->NAME,
-                'isDismissal' => (bool)$item->isDismissal,
-                'rf_PRVSID' => (int)$item->rf_PRVSID,
-                'rf_DepartmentID' => (int)$item->rf_DepartmentID,
-                'rf_PRVDID' => (int)$item->rf_PRVDID,
-                'rf_kl_DepartmentProfileID' => $item->rf_kl_DepartmentProfileID == '0' ? null : (int)$item->rf_kl_DepartmentProfileID,
-                'rf_kl_DepartmentTypeID' => $item->rf_kl_DepartmentTypeID == '0' ? null : (int)$item->rf_kl_DepartmentTypeID,
-                'MainWorkPlace' => (bool)$item->MainWorkPlace,
-                'InTime' => (bool)$item->InTime,
-                'ShownInSchedule' => (bool)$item->ShownInSchedule,
-                'isSpecial' => (bool)$item->isSpecial,
-            ];
-        });
+        $staff = Staff::where('snils', '=', $snils)->first();
 
         $templates = MisRoleTemplate::with(['createUser'])->get();
 
         return Inertia::render('MIS/Users/Show', [
             'user' => $user,
             'x_user' => $xUser,
-            'jobs' => $jobs,
-            'departments' => $this->getDepartments(),
-            'prvd' => $this->getPrvd(),
-            'prvs' => $this->getPrvs(),
-            'lpus' => $this->getLpu(),
-            'department_types' => $this->getDepartmentType(),
-            'department_profiles' => $this->getDepartmentProfiles(),
+            'jobs' => $prvds,
+            'staff' => $staff,
+            'departments' => $this->formattedDepartments(),
+            'prvd' => $this->formattedPrvd(),
+            'prvs' => $this->formattedPrvs(),
+            'lpus' => $this->formattedLpus(),
+            'department_types' => $this->formattedDepartmentType(),
+            'department_profiles' => $this->formattedDepartmentProfile(),
             'roles' => $this->getRoles(),
             'user_roles' => empty($xUser) ? [] : $this->getRolesByUserId($xUser->UserID),
             'role_templates' => $templates
         ]);
     }
 
+    /**
+     * @throws \Throwable
+     */
     public function createUser(Request $request)
     {
-        $data = $request->validate([
-            'PCOD' => ['required', 'string'],
-            'OT_V' => ['required', 'string'],
-            'IM_V' => ['required', 'string'],
-            'FAM_V' => ['required', 'string'],
-            'DR' => ['required', 'string'],
-            'SS' => ['required', 'string'],
-            'isDoctor' => ['required', 'boolean'],
-            'inTime' => ['required', 'boolean'],
-            'isSpecial' => ['required', 'boolean'],
-            'isDismissal' => ['required', 'boolean'],
-            'S_ST' => ['required', 'numeric'],
-            'rf_LPUID' => ['required', 'numeric'],
-            'rf_PRVSID' => ['required', 'numeric'],
-            'rf_DepartmentID' => ['required', 'numeric'],
-            'rf_PRVDID' => ['required', 'numeric'],
+        $data = DoctorData::factory()->withoutOptionalValues()->from([
+            ...$request->all(),
+            'start_at' => Optional::create(),
+            'end_at' => Optional::create(),
+            'guid' => Str::uuid(),
         ]);
 
-        $data['DR'] = Carbon::parse($data['DR'])->toDateTimeLocalString();
+        $data = $data
+            ->except('prvs_code', 'prvs_name', 'lpu_name', 'department_name', 'prvd_name', 'has_password_change');
 
-        DB::connection('mis')->beginTransaction();
+        $xUser = [
+            'GeneralLogin' => $this->formatedLogin($data->last_name, $data->middle_name, $data->first_name),
+            'AuthMode' => 1,
+            'FIO' => "$data->last_name $data->first_name $data->middle_name",
+        ];
 
         try {
-            DB::connection('mis')
-                ->table('hlt_LPUDoctor')
-                ->insert(Arr::except($data, ['S_ST']));
-
-            $lpuDoctorId = DB::connection('mis')
-                ->selectOne("SELECT IDENT_CURRENT('hlt_LPUDoctor') as LPUDoctorID")
-                ->LPUDoctorID;
-
-            $dataPRVD = Arr::except($data, ['OT_V', 'IM_V', 'FAM_V', 'DR', 'SS', 'isDoctor', 'rf_LPUID']);
-            $dataPRVD['rf_LPUDoctorID'] = $lpuDoctorId;
-            $dataPRVD['D_END'] = Carbon::parse('2222-01-01 00:00:00.000')->toDateTimeLocalString();
-            $dataPRVD['rf_ResourceTypeID'] = 1;
-
-            $prvd = DB::connection('mis')
-                ->table('oms_PRVD')
-                ->select([
-                    'C_PRVD'
-                ])
-                ->where('PRVDID', '=', $data['rf_PRVDID'])
-                ->first();
-
-            $hasExistFrmrPrvd = DB::connection('mis')
-                ->table('oms_kl_FrmrPrvd')
-                ->where('Code', $prvd->C_PRVD)
-                ->exists();
-
-            $dataPRVD['rf_kl_FrmrPrvdID'] = $hasExistFrmrPrvd ? $prvd->C_PRVD : 0;
-
-            DB::connection('mis')
-                ->table('hlt_DocPRVD')
-                ->insert($dataPRVD);
-
-            $login = $this->formatedLogin($data['FAM_V'], $data['OT_V'], $data['IM_V']);
-
-            $xUser = [
-                'GeneralLogin' => $login,
-                'AuthMode' => 1,
-                'FIO' => "{$data['FAM_V']} {$data['IM_V']} {$data['OT_V']}",
-                'GeneralPassword' => ''
-            ];
-
-            DB::connection('mis')
-                ->table('x_User')
-                ->insert($xUser);
-
-            $createdXUser = DB::connection('mis')
-                ->table('x_User')
-                ->select(['UserID', 'GUID'])
-                ->where('GeneralLogin', '=', $login)
-                ->first();
-
-            $xUser['GeneralPassword'] = $this->computeHash('1234567', $createdXUser->GUID);
-
-            $updatedXUser = DB::connection('mis')
-                ->table('x_User')
-                ->where('UserID', '=', $createdXUser->UserID)
-                ->update($xUser);
-
-//            select * from x_UserSettings
-//            where Property = 'Код врача' and ValueStr = '246515'
-            $settingPcod = [
-                'rf_UserID' => (int)$createdXUser->UserID,
-                'Property' => 'Код врача',
-                'DocTypeDefGUID' => Uuid::NIL,
-                'ValueStr' => $data['PCOD'],
-                'rf_SettingTypeID' => 7,
-                'OwnerGUID' => $createdXUser->GUID
-            ];
-
-            DB::connection('mis')
-                ->table('x_UserSettings')
-                ->insert($settingPcod);
-
-            DB::connection('mis')->commit();
-
-        } catch (\Exception $e) {
-            DB::connection('mis')->rollBack();
-            throw $e;
+            $user = MisXUser::createUser($xUser);
+            $doctor = MisDoctor::createDoctor($data, true);
+            $hasAssigned = MisXUser::assignToDoctor($user, $doctor->code);
+        } catch (\Exception $ex) {
+            Log::error("Ошибка при создании учетной записи: " . $ex->getMessage());
         }
 
+//        DB::connection('mis')->beginTransaction();
+//
+//        try {
+//            DB::connection('mis')
+//                ->table('hlt_LPUDoctor')
+//                ->insert(Arr::except($data, ['S_ST']));
+//
+//            $lpuDoctorId = DB::connection('mis')
+//                ->selectOne("SELECT IDENT_CURRENT('hlt_LPUDoctor') as LPUDoctorID")
+//                ->LPUDoctorID;
+//
+//            $dataPRVD = Arr::except($data, ['OT_V', 'IM_V', 'FAM_V', 'DR', 'SS', 'isDoctor', 'rf_LPUID']);
+//            $dataPRVD['rf_LPUDoctorID'] = $lpuDoctorId;
+//            $dataPRVD['D_END'] = Carbon::parse('2222-01-01 00:00:00.000')->toDateTimeLocalString();
+//            $dataPRVD['rf_ResourceTypeID'] = 1;
+//
+//            $prvd = DB::connection('mis')
+//                ->table('oms_PRVD')
+//                ->select([
+//                    'C_PRVD'
+//                ])
+//                ->where('PRVDID', '=', $data['rf_PRVDID'])
+//                ->first();
+//
+//            $hasExistFrmrPrvd = DB::connection('mis')
+//                ->table('oms_kl_FrmrPrvd')
+//                ->where('Code', $prvd->C_PRVD)
+//                ->exists();
+//
+//            $dataPRVD['rf_kl_FrmrPrvdID'] = $hasExistFrmrPrvd ? $prvd->C_PRVD : 0;
+//
+//            DB::connection('mis')
+//                ->table('hlt_DocPRVD')
+//                ->insert($dataPRVD);
+//
+//            $login = $this->formatedLogin($data['FAM_V'], $data['OT_V'], $data['IM_V']);
+//
+//            $xUser = [
+//                'GeneralLogin' => $login,
+//                'AuthMode' => 1,
+//                'FIO' => "{$data['FAM_V']} {$data['IM_V']} {$data['OT_V']}",
+//                'GeneralPassword' => ''
+//            ];
+//
+//            DB::connection('mis')
+//                ->table('x_User')
+//                ->insert($xUser);
+//
+//            $createdXUser = DB::connection('mis')
+//                ->table('x_User')
+//                ->select(['UserID', 'GUID'])
+//                ->where('GeneralLogin', '=', $login)
+//                ->first();
+//
+//            $xUser['GeneralPassword'] = $this->computeHash('1234567', $createdXUser->GUID);
+//
+//            $updatedXUser = DB::connection('mis')
+//                ->table('x_User')
+//                ->where('UserID', '=', $createdXUser->UserID)
+//                ->update($xUser);
+//
+////            select * from x_UserSettings
+////            where Property = 'Код врача' and ValueStr = '246515'
+//            $settingPcod = [
+//                'rf_UserID' => (int)$createdXUser->UserID,
+//                'Property' => 'Код врача',
+//                'DocTypeDefGUID' => Uuid::NIL,
+//                'ValueStr' => $data['PCOD'],
+//                'rf_SettingTypeID' => 7,
+//                'OwnerGUID' => $createdXUser->GUID
+//            ];
+//
+//            DB::connection('mis')
+//                ->table('x_UserSettings')
+//                ->insert($settingPcod);
+//
+//            DB::connection('mis')->commit();
+//
+//        } catch (\Exception $e) {
+//            DB::connection('mis')->rollBack();
+//            throw $e;
+//        }
         return redirect(route('mis.users'));
     }
 
+    /**
+     * @throws \Throwable
+     */
     public function createPost(int $userId, Request $request)
     {
-        $data = $request->validate([
-            'PCOD' => ['required', 'string'],
-            'MainWorkPlace' => ['required', 'boolean'],
-            'InTime' => ['required', 'boolean'],
-            'ShownInSchedule' => ['required', 'boolean'],
-            'isSpecial' => ['required', 'boolean'],
-            'isDismissal' => ['required', 'boolean'],
-            'S_ST' => ['required', 'numeric'],
-            'rf_DepartmentID' => ['required', 'numeric'],
-            'rf_PRVDID' => ['required', 'numeric'],
-            'rf_PRVSID' => ['required', 'numeric'],
-            'rf_kl_DepartmentProfileID' => ['required', 'numeric'],
-            'rf_kl_DepartmentTypeID' => ['required', 'numeric'],
+        $data = PrvdData::from([
+            ...$request->all(),
+            'guid' => Str::uuid(),
+            'start_at' => CarbonImmutable::now()->format('Y-m-d H:i:s.u'),
+            'end_at' => CarbonImmutable::create(2222, 01, 01)->format('Y-m-d H:i:s.u'),
         ]);
 
-        $data['rf_LPUDoctorID'] = $userId;
-        $data['rf_ResourceTypeID'] = 1;
-
-        DB::connection('mis')->beginTransaction();
-
-        try {
-            DB::connection('mis')
-                ->table('hlt_DocPRVD')
-                ->insert($data);
-
-            DB::connection('mis')->commit();
-
-        } catch (\Exception $e) {
-            DB::connection('mis')->rollBack();
-            throw $e;
-        }
+        $post = MisDoctor::createPrvd($data);
 
         return redirect(route('mis.user', ['userId' => $userId]));
     }
 
-    public function updateUser(int $doctorId, Request $request)
+    public function updateUser(int $userId, Request $request)
     {
-        $data = $request->validate([
-            'PCOD' => ['required', 'string'],
-            'OT_V' => ['required', 'string'],
-            'IM_V' => ['required', 'string'],
-            'FAM_V' => ['required', 'string'],
-            'DR' => ['required', 'string'],
-            'SS' => ['required', 'string'],
-            'isDoctor' => ['required', 'boolean'],
-            'inTime' => ['required', 'boolean'],
-            'isSpecial' => ['required', 'boolean'],
-            'isDismissal' => ['required', 'boolean'],
-            'rf_LPUID' => ['required', 'numeric'],
-            'rf_PRVSID' => ['required', 'numeric'],
-            'rf_DepartmentID' => ['required', 'numeric'],
-            'rf_PRVDID' => ['required', 'numeric'],
-        ]);
-        $data['DR'] = Carbon::parse($data['DR'])->toDateTimeLocalString();
+//        $data = $request->validate([
+//            'PCOD' => ['required', 'string'],
+//            'OT_V' => ['required', 'string'],
+//            'IM_V' => ['required', 'string'],
+//            'FAM_V' => ['required', 'string'],
+//            'DR' => ['required', 'string'],
+//            'SS' => ['required', 'string'],
+//            'isDoctor' => ['required', 'boolean'],
+//            'inTime' => ['required', 'boolean'],
+//            'isSpecial' => ['required', 'boolean'],
+//            'isDismissal' => ['required', 'boolean'],
+//            'rf_LPUID' => ['required', 'numeric'],
+//            'rf_PRVSID' => ['required', 'numeric'],
+//            'rf_DepartmentID' => ['required', 'numeric'],
+//            'rf_PRVDID' => ['required', 'numeric'],
+//        ]);
+//        $data['DR'] = Carbon::parse($data['DR'])->toDateTimeLocalString();
+        $data = DoctorData::from($request->all());
+        dd($data->toArray());
 
         $hasUpdated = DB::connection('mis')
             ->table('hlt_LPUDoctor')
-            ->where('LPUDoctorID', '=', $doctorId)
+            ->where('LPUDoctorID', '=', $userId)
             ->update($data);
 
-        return redirect(route('mis.user', ['userId' => $doctorId]));
+        return redirect(route('mis.user', ['userId' => $userId]));
     }
 
     public function updateOrCreateAccess(int $doctorId, Request $request)
@@ -330,26 +304,12 @@ class MisController extends Controller
 
     public function updatePost(int $doctorId, Request $request)
     {
-        $data = $request->validate([
-            'PCOD' => ['required', 'string'],
-            'MainWorkPlace' => ['required', 'boolean'],
-            'InTime' => ['required', 'boolean'],
-            'ShownInSchedule' => ['required', 'boolean'],
-            'isSpecial' => ['required', 'boolean'],
-            'isDismissal' => ['required', 'boolean'],
-            'S_ST' => ['required', 'numeric'],
-            'rf_DepartmentID' => ['required', 'numeric'],
-            'rf_PRVDID' => ['required', 'numeric'],
-            'rf_PRVSID' => ['nullable', 'numeric'],
-            'rf_kl_DepartmentProfileID' => ['numeric'],
-            'rf_kl_DepartmentTypeID' => ['numeric'],
-        ]);
+        $data = PrvdData::from($request->all());
 
-        $prvdId = $request->input('DocPRVDID');
         $prvd = DB::connection('mis')
             ->table('hlt_DocPRVD')
-            ->where('DocPRVDID', '=', $prvdId)
-            ->update($data);
+            ->where('DocPRVDID', '=', $data->id)
+            ->update($data->except('id', 'guid')->toArray());
 
         return redirect(route('mis.user', ['userId' => $doctorId]));
     }
@@ -508,187 +468,13 @@ class MisController extends Controller
         return redirect(route('mis.templates.roles'));
     }
 
-    private function getDepartments() : Collection
+    public function importDoctors(Request $request)
     {
-        // Кеширование отделений (актуальность 1 сутки, устаревание 2 суток)
-        $departments = Cache::flexible('mis_departments', [86400, 172800], function() {
-            return DB::connection('mis')
-                ->table('oms_Department')
-                ->select(
-                    [
-                        'oms_Department.DepartmentID', 'oms_Department.DepartmentCODE', 'oms_Department.DepartmentNAME',
-                        'oms_Department.rf_kl_DepartmentTypeID', 'oms_Department.rf_kl_DepartmentProfileID'
-                    ]
-                )
-                ->join('oms_LPU', 'oms_Department.rf_LPUID', '=', 'oms_LPU.LPUID')
-                ->where('oms_Department.DepartmentID', '>', 0)
-                ->where('oms_LPU.rf_MainLPUID', '=', 844)
-                ->whereDate('oms_Department.Date_E', '>', Carbon::now()->toDateString())
-                ->orderBy('oms_Department.DepartmentID')
-                ->get();
-        });
+        $file = $request->file('file');
 
-        $departments = $departments->map(function ($item) {
-            return [
-                'value' => intval($item->DepartmentID),
-                'label' => "$item->DepartmentCODE - $item->DepartmentNAME",
-                'type_id' => intval($item->rf_kl_DepartmentTypeID),
-                'profile_id' => intval($item->rf_kl_DepartmentProfileID),
-            ];
-        });
-
-        return $departments;
+        MisImport::doctors($file);
     }
-    private function getPrvd() : Collection
-    {
-        // Кеширование должностей (актуальность 1 сутки, устаревание 2 суток)
-        $prvd = Cache::flexible('mis_prvd', [86400, 172800], function() {
-            return DB::connection('mis')
-                ->table('oms_PRVD')
-                ->select(
-                    [
-                        'oms_PRVD.PRVDID', 'oms_PRVD.C_PRVD', 'oms_PRVD.NAME',
-                    ]
-                )
-                ->where('oms_PRVD.PRVDID', '>', 0)
-                ->whereDate('oms_PRVD.Date_E', '>', Carbon::now()->toDateString())
-                ->orderBy('oms_PRVD.PRVDID')
-                ->get();
-        });
 
-        $prvd = $prvd->map(function ($item) {
-            return [
-                'value' => intval($item->PRVDID),
-                'label' => "$item->C_PRVD - $item->NAME",
-                'c_prvd' => $item->C_PRVD,
-            ];
-        });
-
-        return $prvd;
-    }
-    private function getPrvs() : Collection
-    {
-        // Кеширование специальностей (актуальность 1 сутки, устаревание 2 суток)
-        $prvs = Cache::flexible('mis_prvs', [86400, 172800], function() {
-            return DB::connection('mis')
-                ->table('oms_PRVS')
-                ->select(
-                    [
-                        'oms_PRVS.PRVSID', 'oms_PRVS.C_PRVS', 'oms_PRVS.PRVS_NAME',
-                    ]
-                )
-                ->where('oms_PRVS.PRVSID', '>', 0)
-                ->whereDate('oms_PRVS.Date_End', '>', Carbon::now()->toDateString())
-                ->orderBy('oms_PRVS.PRVSID')
-                ->get();
-        });
-
-        $prvs = $prvs->map(function ($item) {
-            return [
-                'value' => intval($item->PRVSID),
-                'label' => "$item->C_PRVS - $item->PRVS_NAME",
-                'c_prvs' => $item->C_PRVS,
-            ];
-        });
-
-        return $prvs;
-    }
-    private function getLpu() : Collection
-    {
-        // Кеширование главное лпу (актуальность всегда)
-        $mainLpu = Cache::forever('mis_main_lpu', DB::connection('mis')
-            ->table('Oms_LPU')
-            ->select(
-                [
-                    'Oms_LPU.LPUID', 'Oms_LPU.MCOD', 'Oms_LPU.M_NAMES',
-                ]
-            )
-            ->where('Oms_LPU.LPUID', '=', 844)
-            ->first());
-
-        $mainLpu = Cache::get('mis_main_lpu');
-
-        // Кеширование ЛПУ (актуальность 1 сутки, устаревание 2 суток)
-        $lpus = Cache::flexible('mis_lpus', [86400, 172800], function() use ($mainLpu) {
-            $lpu = DB::connection('mis')
-                ->table('Oms_LPU')
-                ->select(
-                    [
-                        'Oms_LPU.LPUID', 'Oms_LPU.MCOD', 'Oms_LPU.M_NAMES',
-                    ]
-                )
-                ->where('Oms_LPU.LPUID', '>', 0)
-                ->where('Oms_LPU.rf_MainLPUID', '=', $mainLpu->LPUID)
-                ->whereDate('Oms_LPU.DATE_E', '>', Carbon::now()->toDateString())
-                ->orderBy('Oms_LPU.LPUID')
-                ->get();
-
-            $lpu->prepend($mainLpu);
-
-            return $lpu;
-        });
-
-        $lpus = $lpus->map(function ($item) {
-            return [
-                'value' => intval($item->LPUID),
-                'label' => "$item->MCOD - $item->M_NAMES",
-            ];
-        });
-
-        return $lpus;
-    }
-    private function getDepartmentType() : Collection
-    {
-        // Кеширование тип отделений (актуальность 1 сутки, устаревание 2 суток)
-        $departmentTypes = Cache::flexible('mis_department_type', [86400, 172800], function() {
-            return DB::connection('mis')
-                ->table('oms_kl_DepartmentType')
-                ->select(
-                    [
-                        'oms_kl_DepartmentType.kl_DepartmentTypeID', 'oms_kl_DepartmentType.Code', 'oms_kl_DepartmentType.Name',
-                    ]
-                )
-                ->where('oms_kl_DepartmentType.kl_DepartmentTypeID', '>', 0)
-                ->whereDate('oms_kl_DepartmentType.Date_E', '>', Carbon::now()->toDateString())
-                ->orderBy('oms_kl_DepartmentType.kl_DepartmentTypeID')
-                ->get();
-        });
-
-        $departmentTypes = $departmentTypes->map(function ($item) {
-            return [
-                'value' => intval($item->kl_DepartmentTypeID),
-                'label' => "$item->Code - $item->Name",
-            ];
-        });
-
-        return $departmentTypes;
-    }
-    private function getDepartmentProfiles() : Collection
-    {
-        // Кеширование тип отделений (актуальность 1 сутки, устаревание 2 суток)
-        $departmentProfiles = Cache::flexible('mis_department_profile', [86400, 172800], function() {
-            return DB::connection('mis')
-                ->table('oms_kl_DepartmentProfile')
-                ->select(
-                    [
-                        'oms_kl_DepartmentProfile.kl_DepartmentProfileID', 'oms_kl_DepartmentProfile.Code', 'oms_kl_DepartmentProfile.Name',
-                    ]
-                )
-                ->where('oms_kl_DepartmentProfile.kl_DepartmentProfileID', '>', 0)
-                ->whereDate('oms_kl_DepartmentProfile.Date_E', '>', Carbon::now()->toDateString())
-                ->orderBy('oms_kl_DepartmentProfile.kl_DepartmentProfileID')
-                ->get();
-        });
-
-        $departmentProfiles = $departmentProfiles->map(function ($item) {
-            return [
-                'value' => intval($item->kl_DepartmentProfileID),
-                'label' => "$item->Code - $item->Name",
-            ];
-        });
-
-        return $departmentProfiles;
-    }
     private function getRoles() : array|\Illuminate\Contracts\Pagination\CursorPaginator|\Illuminate\Contracts\Pagination\Paginator|\Illuminate\Pagination\AbstractCursorPaginator|\Illuminate\Pagination\AbstractPaginator|Collection|\Illuminate\Support\Enumerable|\Illuminate\Support\LazyCollection|\Spatie\LaravelData\CursorPaginatedDataCollection|\Spatie\LaravelData\DataCollection|\Spatie\LaravelData\PaginatedDataCollection
     {
         // Кеширование тип отделений (актуальность 7 сутки, устаревание 10 суток)
@@ -789,5 +575,70 @@ class MisController extends Controller
         }
 
         return base64_encode($hash);
+    }
+
+    private function formattedLpus()
+    {
+        return MisClassifier::getLpu()->map(function (ClassifierLPUData $item) {
+            return [
+                'value' => $item->id,
+                'label' => "$item->code - $item->name",
+            ];
+        });
+    }
+
+    private function formattedDepartments()
+    {
+        return MisClassifier::getDepartment()->map(function (ClassifierDepartmentData $item) {
+            return [
+                'value' => $item->id,
+                'label' => "$item->code - $item->name",
+                'type_id' => $item->type_id,
+                'profile_id' => $item->profile_id,
+            ];
+        });
+    }
+
+    private function formattedPrvd()
+    {
+        return MisClassifier::getPrvd()->map(function (ClassifierPrvdData $item) {
+            return [
+                'value' => $item->id,
+                'label' => "$item->code - $item->name",
+                'c_prvd' => $item->code,
+                'name' => $item->name
+            ];
+        });
+    }
+
+    private function formattedPrvs()
+    {
+        return MisClassifier::getPrvs()->map(function (ClassifierPrvsData $item) {
+            return [
+                'value' => $item->id,
+                'label' => "$item->code - $item->name",
+                'c_prvs' => $item->code,
+            ];
+        });
+    }
+
+    private function formattedDepartmentProfile()
+    {
+        return MisClassifier::getDepartmentProfile()->map(function (ClassifierDepartmentProfileData $item) {
+            return [
+                'value' => $item->id,
+                'label' => "$item->code - $item->name",
+            ];
+        });
+    }
+
+    private function formattedDepartmentType()
+    {
+        return MisClassifier::getDepartmentType()->map(function (ClassifierDepartmentTypeData $item) {
+            return [
+                'value' => $item->id,
+                'label' => "$item->code - $item->name",
+            ];
+        });
     }
 }

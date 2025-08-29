@@ -252,7 +252,7 @@ onMounted(() => {
                 >
                     <NFlex justify="space-between" align="center">
                         <div>
-                            &copy; <Link href="https://github.com/brusnitsyn">@brusnitsyn</Link> 2024
+                            &copy; <a href="https://github.com/brusnitsyn" target="_blank">@brusnitsyn</a> 2024 - 2025
                         </div>
                         <NTag v-if="processingCertification.status !== null" size="small" round :type="processingCertification.type">
                             <template #icon />

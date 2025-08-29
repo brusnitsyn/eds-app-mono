@@ -2,6 +2,9 @@
 import EdsModal from "@/Components/Eds/EdsModal.vue";
 import {useForm} from "@inertiajs/vue3";
 import {IconCheck} from "@tabler/icons-vue";
+import {format} from "date-fns"
+import EdsDatePicker from "@/Components/Eds/EdsDatePicker.vue";
+import {NEllipsis, NTooltip} from "naive-ui";
 
 const show = defineModel('show')
 const props = defineProps({
@@ -16,19 +19,24 @@ const props = defineProps({
 })
 
 const form = useForm({
-    S_ST: 1.00,
-    PCOD: null,
-    rf_PRVSID: null,
-    rf_DepartmentID: null,
-    rf_PRVDID: null,
-    rf_kl_DepartmentProfileID: null,
-    rf_kl_DepartmentTypeID: null,
-    MainWorkPlace: false,
-    InTime: false,
-    ShownInSchedule: false,
-    isSpecial: false,
-    isDismissal: false,
+    doctor_id: props.user.id,
+    name: '',
+    rate: 1.00,
+    code: null,
+    prvs_id: null,
+    department_id: null,
+    prvd_id: null,
+    department_profile_id: null,
+    department_type_id: null,
+    main_work_place: false,
+    in_time: false,
+    shown_in_schedule: false,
+    is_special: false,
+    is_dismissal: false,
+    start_at: null,
+    end_at: null,
 })
+console.log(format(new Date(), 'yyyy-MM-dd'))
 const title = computed(() => editMode.value === true ? 'Редактирование должности' : 'Добавить должность')
 const editMode = computed(() => props.post !== null)
 const hasLoading = ref(true)
@@ -57,20 +65,21 @@ const onAfterLeave = () => {
 
 const updateDepartment = (value) => {
     const department = props.departments.find(itm => itm.value === value)
-    const departmentType = props.departmentTypes.find(itm => itm.value = department.type_id)
-    const departmentProfile = props.departmentProfiles.find(itm => itm.value = department.profile_id)
-    form.rf_kl_DepartmentProfileID = departmentProfile.value
-    form.rf_kl_DepartmentTypeID = departmentType.value
+    const departmentType = props.departmentTypes.find(itm => itm.value === department.type_id)
+    const departmentProfile = props.departmentProfiles.find(itm => itm.value === department.profile_id)
+    form.department_profile_id = departmentProfile.value
+    form.department_type_id = departmentType.value
 }
 
 const submit = () => {
     if (editMode.value) {
         form.transform((data) => ({
             ...data,
-            DocPRVDID: props.post.DocPRVDID,
-            rf_kl_DepartmentProfileID: data.rf_kl_DepartmentProfileID ?? 0,
-            rf_kl_DepartmentTypeID: data.rf_kl_DepartmentTypeID ?? 0,
-        })).submit('put', route('mis.users.user.post.update', { userId: props.user.LPUDoctorID }), {
+            id: props.post.id,
+            department_profile_id: data.department_profile_id ?? 0,
+            department_type_id: data.department_type_id ?? 0,
+            guid: props.post.guid
+        })).submit('put', route('mis.users.user.post.update', { userId: props.user.id }), {
             onSuccess: () => {
                 show.value = false
                 form.reset()
@@ -79,15 +88,30 @@ const submit = () => {
 
         return
     }
-    form.PCOD = `${props.user.PCOD}-${props.posts.length + 1}`
+
+    form.code = `${props.user.code}-${props.posts.length + 1}`
 
     form.transform((data) => ({
         ...data,
-        S_ST: data.S_ST.toFixed(2)
+        rate: data.rate.toFixed(2),
+        name: data.name === null || data.name === '' ? props.prvd.find(itm => itm.value === form.prvd_id).name : data.name
     }))
-        .submit('post', route('mis.users.post.create', {userId: props.user.LPUDoctorID}))
+        .submit('post', route('mis.users.post.create', {userId: props.user.id}), {
+            onSuccess: () => {
+                show.value = false
+                form.reset()
+            }
+        })
+}
 
-    console.log(form.data())
+const renderLabel = (option) => {
+    return h(
+        NEllipsis,
+        {},
+        {
+            default: () => option.label
+        }
+    )
 }
 </script>
 
@@ -96,39 +120,45 @@ const submit = () => {
         <NForm v-model="form" @submit.prevent="submit" class="h-full">
             <NFlex vertical justify="space-between" class="h-full">
                 <NGrid cols="6" x-gap="8">
+                    <NFormItemGi span="6" label="Наименование должности">
+                        <NInput v-model:value="form.name" placeholder="Поле можно оставить пустым" />
+                    </NFormItemGi>
                     <NFormItemGi span="4" label="Отделение">
-                        <NSelect v-model:value="form.rf_DepartmentID" :options="departments" filterable @update:value="value => updateDepartment(value)" />
+                        <NSelect v-model:value="form.department_id" :options="departments" filterable :render-label="renderLabel" @update:value="value => updateDepartment(value)" />
                     </NFormItemGi>
                     <NFormItemGi span="2" label="Тип отделения">
-                        <NSelect v-model:value="form.rf_kl_DepartmentTypeID" :options="departmentTypes" filterable />
+                        <NSelect v-model:value="form.department_type_id" :options="departmentTypes" filterable :render-label="renderLabel" />
                     </NFormItemGi>
                     <NFormItemGi span="5" label="Должность">
-                        <NSelect v-model:value="form.rf_PRVDID" :options="prvd" filterable />
+                        <NSelect v-model:value="form.prvd_id" :options="prvd" filterable :render-label="renderLabel" />
                     </NFormItemGi>
                     <NFormItemGi span="1" label="Ставка">
-                        <NInputNumber v-model:value="form.S_ST" min="0.25" max="1.00" precision="2" step="0.25" />
+                        <NInputNumber v-model:value="form.rate" min="0.25" max="1.00" precision="2" step="0.25" />
                     </NFormItemGi>
                     <NFormItemGi span="3" label="Специальность">
-                        <NSelect v-model:value="form.rf_PRVSID" :options="prvs" filterable />
+                        <NSelect v-model:value="form.prvs_id" :options="prvs" filterable :render-label="renderLabel" />
                     </NFormItemGi>
                     <NFormItemGi span="3" label="Профиль">
-                        <NSelect v-model:value="form.rf_kl_DepartmentProfileID" :options="departmentProfiles" filterable />
+                        <NSelect v-model:value="form.department_profile_id" :options="departmentProfiles" filterable :render-label="renderLabel" />
                     </NFormItemGi>
 
                     <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                        <NCheckbox v-model:checked="form.MainWorkPlace" label="Основная должность" />
+                        <NCheckbox v-model:checked="form.main_work_place" label="Основная должность" />
                     </NFormItemGi>
                     <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                        <NCheckbox v-model:checked="form.isSpecial" label="Узкий специалист" />
+                        <NCheckbox v-model:checked="form.is_special" label="Узкий специалист" />
                     </NFormItemGi>
                     <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                        <NCheckbox v-model:checked="form.InTime" label="Ведёт приём" />
+                        <NCheckbox v-model:checked="form.in_time" label="Ведёт приём" />
                     </NFormItemGi>
                     <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                        <NCheckbox v-model:checked="form.ShownInSchedule" label="Доступен в расписании" />
+                        <NCheckbox v-model:checked="form.shown_in_schedule" label="Доступен в расписании" />
                     </NFormItemGi>
-                    <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                        <NCheckbox v-model:checked="form.isDismissal" label="Увольнение" />
+                    <NFormItemGi span="2" :show-label="false" :show-feedback="false">
+                        <NCheckbox v-model:checked="form.is_dismissal" label="Увольнение" />
+                    </NFormItemGi>
+                    <NFormItemGi v-if="form.is_dismissal" span="4" :show-label="false" :show-feedback="false">
+                        <EdsDatePicker v-model:value="form.end_at" class="!w-1/2" />
                     </NFormItemGi>
                 </NGrid>
 

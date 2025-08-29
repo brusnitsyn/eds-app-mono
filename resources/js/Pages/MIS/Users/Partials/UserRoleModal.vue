@@ -1,9 +1,7 @@
 <script setup>
 import EdsModal from "@/Components/Eds/EdsModal.vue"
-import {useDebouncedRefHistory} from "@vueuse/core";
-import EdsSearchInput from "@/Components/Eds/EdsSearchInput.vue";
 import {IconCheck, IconTemplate} from "@tabler/icons-vue";
-import {useForm} from "@inertiajs/vue3";
+import {router, useForm} from "@inertiajs/vue3";
 const show = defineModel('show')
 
 const props = defineProps({
@@ -14,13 +12,6 @@ const props = defineProps({
     roleTemplates: Array
 })
 
-const templates = [
-    {
-        label: 'Тестовый шаблон',
-        key: 'Тестовый шаблон',
-        roles: [1, 2, 3, 4, 5]
-    }
-]
 const form = useForm({
     user_id: props.xUser.UserID,
     roles: [
@@ -29,24 +20,13 @@ const form = useForm({
         })
     ]
 })
-const filteredRoles = ref([
-    ...props.roles
+const mappedRoles = ref([
+    ...props.roles.map((itm) => ({
+        label: itm.name,
+        value: itm.role_id,
+        guid: itm.guid
+    }))
 ])
-const onlySelectedRoles = ref(false)
-
-const _search = ref('')
-const search = computed({
-    get() {
-        return _search.value
-    },
-    set(value) {
-        _search.value = value
-        if (value === '') filteredRoles.value = props.roles
-        filteredRoles.value = filteredRoles.value.filter(item => {
-            return item.name.toLowerCase().match(value.toLowerCase())
-        })
-    }
-})
 
 const handleSelectRole = (key) => {
     const template = props.roleTemplates.find(itm => itm.id === key)
@@ -58,60 +38,53 @@ const handleSelectRole = (key) => {
 
 const submit = () => {
     form
-        .submit('put', route('mis.users.user.roles.update', { userId: props.user.LPUDoctorID }),
+        .submit('put', route('mis.users.user.roles.update', { userId: props.user.id }),
             {
                 onSuccess: () => {
                     show.value = false
-                    form.reset()
                 }
             })
 }
 
 const onAfterLeave = () => {
     form.reset()
+    mappedRoles.value = [
+        ...props.roles.map((itm) => ({
+            label: itm.name,
+            value: itm.role_id,
+            guid: itm.guid
+        }))
+    ]
 }
 </script>
 
 <template>
     <EdsModal v-model:show="show" class="h-[742px]" title="Роли пользователя" @after-leave="onAfterLeave">
         <NFlex vertical justify="space-between" class="h-full">
-            <NSpace vertical>
-                <NGrid :cols="5">
-                    <NGi :span="3">
-                        <EdsSearchInput v-model:search="search"
-                                        :debounce="500"
-                                        placeholder="Поиск роли"
-                                        @searched="(value) => search = value"
-                                        size="medium"
-                                        class="w-full" />
-                    </NGi>
-                    <NGi :span="2">
-                        <NSpace align="center" justify="end">
-                            <NCheckbox v-model:checked="onlySelectedRoles" />
-                            <NDropdown trigger="hover" :options="roleTemplates" label-field="name" key-field="id" placement="bottom-end" @select="handleSelectRole">
-                                <NButton secondary type="primary">
-                                    <template #icon>
-                                        <NIcon :component="IconTemplate" />
-                                    </template>
-                                    Шаблоны
-                                </NButton>
-                            </NDropdown>
-                        </NSpace>
-                    </NGi>
-                </NGrid>
-                <NScrollbar class="h-[560px] overflow-hidden relative">
-                    <NForm>
-                        <NCheckboxGroup v-if="filteredRoles.length > 0" v-model:value="form.roles">
-                            <NSpace vertical>
-                                <NCheckbox v-for="role in filteredRoles" :value="role.role_id" :label="role.name" />
-                            </NSpace>
-                        </NCheckboxGroup>
-                        <div v-else class="absolute inset-0 flex items-center justify-center">
-                            <NEmpty />
-                        </div>
-                    </NForm>
-                </NScrollbar>
-            </NSpace>
+            <NFlex vertical class="h-full">
+                <NSpace align="center" justify="end">
+<!--                    <NCheckbox v-model:checked="onlySelectedRoles" />-->
+                    <NDropdown trigger="hover" :options="roleTemplates" label-field="name" key-field="id" placement="bottom-end" @select="handleSelectRole">
+                        <NButton secondary type="primary">
+                            <template #icon>
+                                <NIcon :component="IconTemplate" />
+                            </template>
+                            Шаблоны
+                        </NButton>
+                    </NDropdown>
+                </NSpace>
+                <NForm class="h-full">
+                    <NFormItem :show-label="false" :show-feedback="false" class="h-full">
+                        <NTransfer
+                            v-model:value="form.roles"
+                            :options="mappedRoles"
+                            source-filterable
+                            target-filterable
+                            class="h-full"
+                        />
+                    </NFormItem>
+                </NForm>
+            </NFlex>
             <NFlex justify="end">
                 <NButton attr-type="submit"
                          type="primary"

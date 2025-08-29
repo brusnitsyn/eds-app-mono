@@ -74,6 +74,9 @@ Route::middleware([
             Route::put('{template}', [\App\Http\Controllers\MisController::class, 'updateTemplate'])->name('mis.templates.roles.update');
         });
 
+        Route::prefix('import')->group(function () {
+            Route::post('/doctors', [\App\Http\Controllers\MisController::class, 'importDoctors'])->name('mis.import.doctors');
+        });
 //        Route::prefix('posts')->group(function () {
 //            Route::get('/', [\App\Http\Controllers\MisController::class, 'posts'])->name('mis.posts');
 //        });

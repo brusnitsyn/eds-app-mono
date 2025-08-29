@@ -1,0 +1,85 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: eds-app
+        container_name: eds-app
+        restart: unless-stopped
+        working_dir: /var/www/html
+        volumes:
+            - .:/var/www/html
+            - ./docker/php.ini:/usr/local/etc/php/conf.d/custom.ini
+        networks:
+            - eds-network
+        depends_on:
+            - redis
+
+    # Очереди Laravel
+    queue:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: eds-queue
+        restart: unless-stopped
+        working_dir: /var/www/html
+        volumes:
+            - .:/var/www/html
+        command: php artisan queue:work --sleep=3 --tries=3
+        networks:
+            - eds-network
+        depends_on:
+            - redis
+        environment:
+            - QUEUE_CONNECTION=redis
+
+    # Scheduler для задач по расписанию
+    scheduler:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: eds-scheduler
+        restart: unless-stopped
+        working_dir: /var/www/html
+        volumes:
+            - .:/var/www/html
+        command: >
+            sh -c "echo 'Starting scheduler...' &&
+                   while true; do
+                     php artisan schedule:run --verbose --no-interaction &
+                     sleep 60
+                   done"
+        networks:
+            - eds-network
+        depends_on:
+            - redis
+
+    nginx:
+        image: nginx:alpine
+        container_name: eds-nginx
+        restart: unless-stopped
+        ports:
+            - "30:80"
+        volumes:
+            - .:/var/www/html
+            - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
+        networks:
+            - eds-network
+        depends_on:
+            - app
+
+    redis:
+        image: redis:alpine
+        container_name: redis
+        restart: unless-stopped
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis_data:/data
+        networks:
+            - eds-network
+        command: redis-server --appendonly yes
+
+networks:
+    eds-network:
+        driver: bridge

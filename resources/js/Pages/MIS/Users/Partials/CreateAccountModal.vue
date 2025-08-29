@@ -21,21 +21,24 @@ const hasLoading = ref(true)
 const activeTab = ref('person')
 
 const form = useForm({
-    PCOD: null,
-    OT_V: '',
-    IM_V: '',
-    FAM_V: '',
-    DR: null,
-    SS: '',
-    isDoctor: false,
-    inTime: false,
-    isSpecial: false,
-    isDismissal: false,
-    S_ST: 1.00,
-    rf_LPUID: props.lpus[0].value,
-    rf_PRVSID: null,
-    rf_DepartmentID: null,
-    rf_PRVDID: null,
+    code: null,
+    middle_name: '',
+    first_name: '',
+    last_name: '',
+    brith_at: null,
+    snils: '',
+    is_doctor: false,
+    in_time: false,
+    is_special: false,
+    is_dismissal: false,
+    rate: 1.00,
+    lpu_id: props.lpus[0].value,
+    prvs_id: null,
+    department_id: null,
+    prvd_id: null,
+    start_at: null,
+    end_at: null,
+    guid: null
 })
 
 const onAfterEnter = () => {
@@ -55,7 +58,7 @@ const onAfterLeave = () => {
 
 const submit = () => {
     if (editMode.value) {
-        form.submit('put', route('mis.users.user.update', { userId: props.userEdit.LPUDoctorID }), {
+        form.submit('put', route('mis.users.user.update', { userId: props.userEdit.id }), {
             onSuccess: () => {
                 show.value = false
                 form.reset()
@@ -64,12 +67,12 @@ const submit = () => {
         return
     }
 
-    const cleanSS = form.SS.replace(/[^\d]/g, '')
-    form.PCOD = cleanSS.slice(-6)
+    const cleanSS = form.snils.replace(/[^\d]/g, '')
+    form.code = cleanSS.slice(-6)
 
     form.transform((data) => ({
         ...data,
-        S_ST: data.S_ST.toFixed(2)
+        rate: data.rate.toFixed(2)
     }))
         .submit('post', route('mis.users.create'), {
             onSuccess: () => {
@@ -92,19 +95,19 @@ const submit = () => {
                     <NFlex vertical justify="space-between" class="h-full">
                         <NGrid cols="6" x-gap="8">
                             <NFormItemGi span="6" label="Фамилия">
-                                <NInput v-model:value="form.FAM_V" />
+                                <NInput v-model:value="form.last_name" />
                             </NFormItemGi>
                             <NFormItemGi span="6" label="Имя">
-                                <NInput v-model:value="form.IM_V" />
+                                <NInput v-model:value="form.first_name" />
                             </NFormItemGi>
                             <NFormItemGi span="6" label="Отчество">
-                                <NInput v-model:value="form.OT_V" />
+                                <NInput v-model:value="form.middle_name" />
                             </NFormItemGi>
                             <NFormItemGi span="3" label="Дата рождения">
-                                <EdsDatePicker v-model:value="form.DR" class="w-full" />
+                                <EdsDatePicker v-model:value="form.brith_at" class="w-full" />
                             </NFormItemGi>
                             <NFormItemGi span="3" label="СНИЛС">
-                                <EdsInputSnils v-model:value="form.SS" />
+                                <EdsInputSnils v-model:value="form.snils" />
                             </NFormItemGi>
                         </NGrid>
 
@@ -124,32 +127,32 @@ const submit = () => {
                     <NFlex vertical justify="space-between" class="h-full">
                         <NGrid cols="6" x-gap="8">
                             <NFormItemGi span="4" label="ЛПУ">
-                                <NSelect v-model:value="form.rf_LPUID" :options="lpus" filterable />
+                                <NSelect v-model:value="form.lpu_id" :options="lpus" filterable />
                             </NFormItemGi>
                             <NFormItemGi span="4" label="Отделение">
-                                <NSelect v-model:value="form.rf_DepartmentID" :options="departments" filterable />
+                                <NSelect v-model:value="form.department_id" :options="departments" filterable />
                             </NFormItemGi>
                             <NFormItemGi :span="editMode ? 4 : 5" label="Должность">
-                                <NSelect v-model:value="form.rf_PRVDID" :options="prvd" filterable />
+                                <NSelect v-model:value="form.prvd_id" :options="prvd" filterable />
                             </NFormItemGi>
                             <NFormItemGi v-if="!editMode" span="1" label="Ставка">
-                                <NInputNumber v-model:value="form.S_ST" min="0.25" max="1.00" precision="2" step="0.25" />
+                                <NInputNumber v-model:value="form.rate" min="0.25" max="1.00" precision="2" step="0.25" />
                             </NFormItemGi>
                             <NFormItemGi span="4" label="Специальность">
-                                <NSelect v-model:value="form.rf_PRVSID" :options="prvs" filterable />
+                                <NSelect v-model:value="form.prvs_id" :options="prvs" filterable />
                             </NFormItemGi>
 
                             <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                                <NCheckbox v-model:checked="form.isDoctor" label="Является врачом" />
+                                <NCheckbox v-model:checked="form.is_doctor" label="Является врачом" />
                             </NFormItemGi>
                             <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                                <NCheckbox v-model:checked="form.isSpecial" label="Узкий специалист" />
+                                <NCheckbox v-model:checked="form.is_special" label="Узкий специалист" />
                             </NFormItemGi>
                             <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                                <NCheckbox v-model:checked="form.inTime" label="Доступен в расписании" />
+                                <NCheckbox v-model:checked="form.in_time" label="Доступен в расписании" />
                             </NFormItemGi>
                             <NFormItemGi span="6" :show-label="false" :show-feedback="false">
-                                <NCheckbox v-model:checked="form.isDismissal" label="Увольнение" />
+                                <NCheckbox v-model:checked="form.is_dismissal" label="Увольнение" />
                             </NFormItemGi>
 
                         </NGrid>

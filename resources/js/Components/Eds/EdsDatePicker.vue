@@ -10,7 +10,8 @@ const formatedValue = computed({
         return parsedDate
     },
     set(value) {
-        const formated = format(value, 'yyyy-MM-dd HH:mm:ss')
+        if (value === null) date.value = null
+        const formated = format(value, 'yyyy-MM-dd HH:mm:ss.SSS')
         date.value = formated
     }
 })

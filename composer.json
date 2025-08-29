@@ -19,7 +19,9 @@
         "laravel/tinker": "^2.9",
         "maatwebsite/excel": "^3.1",
         "nelexa/zip": "^4.0",
+        "npub/gos": "^0.9.13",
         "predis/predis": "^2.3",
+        "sentry/sentry-laravel": "^4.15",
         "spatie/laravel-data": "^4.15",
         "tightenco/ziggy": "^2.0",
         "typesense/typesense-php": "^4.9"
