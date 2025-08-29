@@ -151,6 +151,11 @@ class ProcessCertificateUpload implements ShouldQueue
         $serialNumber = $parsedCert['serialNumber'];
         if (intval($serialNumber)) {
             $serialNumber = strtoupper($this->bcdechex($parsedCert['serialNumber']));
+
+            if (hexdec(substr($serialNumber, 0, 2)) >= 0x80) {
+                $serialNumber = '00' . $serialNumber;
+            }
+
             if (strlen($serialNumber) % 2 !== 0) {
                 $serialNumber = '0' . $serialNumber;
             }
