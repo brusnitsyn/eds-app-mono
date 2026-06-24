@@ -8,24 +8,32 @@ import {
     IconUsers,
     IconMenu3,
     IconTable,
-    IconUser, IconDatabaseEdit
+    IconUser, IconDatabaseEdit,
+    IconCertificate,
+    IconLayoutDashboard,
+    IconHistory,
+    IconSettings
 } from '@tabler/icons-vue'
 import Banner from '@/Components/Banner.vue'
-import {NIcon} from "naive-ui"
+import {NIcon, NFlex} from "naive-ui"
 import {useStorage} from "@vueuse/core"
 import packageJson from "../../../package.json"
 import NaiveLayout from "@/Layouts/NaiveLayout.vue"
 import {isLargeScreen, isMediumScreen, isSmallScreen} from "@/Utils/mediaQuery.js";
 import { useI18n } from 'vue-i18n'
 import {useCheckScope} from "@/Composables/useCheckScope.js";
+import {useAppTheme} from "@/Composables/useAppTheme.js";
+import {IconSun, IconMoon} from "@tabler/icons-vue";
 const { t } = useI18n()
 const {hasRole, hasScope, scopes, roles} = useCheckScope()
+const {isDark, toggleTheme} = useAppTheme()
 import {onMounted} from "vue"
 import {generateBreadcrumbs} from "@/Utils/breadcrumbs.js";
 import EdsBreadcrumbs from "@/Components/Eds/EdsBreadcrumbs.vue";
 
 const props = defineProps({
     title: String,
+    subtitle: String,
 });
 
 const page = usePage()
@@ -47,64 +55,117 @@ function renderIcon(icon) {
     return () => h(NIcon, null, { default: () => h(icon) })
 }
 
-const menuOptions = [
+/** Plain link label, or a link label with a small count badge on the right. */
+function renderLinkLabel(text, href, badge) {
+    return () => h(
+        Link,
+        { href },
+        {
+            default: () => badge
+                ? [
+                    h(
+                        NFlex,
+                        {
+                            justify: 'space-between',
+                            align: 'center',
+                        },
+                        {
+                            default: () => [
+                                h('span', null, text),
+                                h('span', {
+                                    style: 'margin-left:auto;font-size:11px;font-weight:600;padding:1px 7px;border-radius:9px;background:rgba(24,160,88,.12);color:var(--primary-color);'
+                                }, String(badge))
+                            ]
+                        }
+                    ),
+                ]
+                : text
+        }
+    )
+}
+
+const certificateTotal = computed(() => page.props.certificateStats?.total ?? 0)
+
+const rawMenuOptions = computed(() => [
     {
-        label: () => h(
-            Link,
+        type: 'group',
+        key: 'g-main',
+        label: 'ОСНОВНОЕ',
+        children: [
+            // {
+            //     label: renderLinkLabel('Персонал', route('staff.index')),
+            //     key: 'staff',
+            //     icon: renderIcon(IconUsers),
+            //     show: hasScope(scopes.CAN_READ_STAFF)
+            // },
             {
-                href: route('staff.index'),
+                label: renderLinkLabel('Дашборд', route('dashboard')),
+                key: 'dashboard',
+                icon: renderIcon(IconLayoutDashboard),
+                show: hasScope(scopes.CAN_READ_STAFF)
             },
             {
-                default: () => 'Персонал'
-            }
-        ),
-        key: 'staff',
-        icon: renderIcon(IconUsers),
-        show: hasScope(scopes.CAN_READ_STAFF)
+                label: renderLinkLabel('Сертификаты', route('certificates.index'), certificateTotal.value),
+                key: 'certificates-index',
+                icon: renderIcon(IconCertificate),
+                show: hasScope(scopes.CAN_READ_STAFF)
+            },
+            {
+                label: renderLinkLabel('Сотрудники', route('staff')),
+                key: 'staff',
+                icon: renderIcon(IconUsers),
+                show: hasScope(scopes.CAN_READ_STAFF)
+            },
+            {
+                label: renderLinkLabel('Журнал событий', route('journal')),
+                key: 'journal',
+                icon: renderIcon(IconHistory),
+                show: hasScope(scopes.CAN_READ_STAFF)
+            },
+        ].filter(item => item.show),
     },
     {
-        label: () => h(
-            Link,
+        type: 'group',
+        key: 'g-admin',
+        label: 'АДМИНИСТРИРОВАНИЕ',
+        children: [
             {
-                href: route('journals.index'),
+                label: renderLinkLabel('Настройки', route('settings')),
+                key: 'settings',
+                icon: renderIcon(IconSettings),
+                show: hasScope(scopes.CAN_ADMIN)
+            },
+            // {
+            //     label: renderLinkLabel('Журналы', route('journals.index')),
+            //     key: 'journals',
+            //     icon: renderIcon(IconTable),
+            //     show: hasScope(scopes.CAN_READ_JOURNALS)
+            // },
+            {
+                label: renderLinkLabel('ТМ:МИС', route('mis.index')),
+                key: 'mis',
+                icon: renderIcon(IconDatabaseEdit),
+                show: (hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN))
             },
             {
-                default: () => 'Журналы'
-            }
-        ),
-        key: 'journals',
-        icon: renderIcon(IconTable),
-        show: hasScope(scopes.CAN_READ_JOURNALS)
+                label: renderLinkLabel('Администрирование', route('admin.index')),
+                key: 'admin',
+                icon: renderIcon(IconTable),
+                show: hasScope(scopes.CAN_ADMIN)
+            },
+        ].filter(item => item.show),
     },
-    {
-        label: () => h(
-            Link,
-            {
-                href: route('mis.index'),
-            },
-            {
-                default: () => 'ТМ:МИС'
-            }
-        ),
-        key: 'mis',
-        icon: renderIcon(IconDatabaseEdit),
-        show: (hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN))
-    },
-    {
-        label: () => h(
-            Link,
-            {
-                href: route('admin.index'),
-            },
-            {
-                default: () => 'Администрирование'
-            }
-        ),
-        key: 'admin',
-        icon: renderIcon(IconTable),
-        show: hasScope(scopes.CAN_ADMIN)
-    }
-]
+])
+
+const menuOptions = computed(() => rawMenuOptions.value.filter(group => group.children.length))
+
+const CERTIFICATES_KEY_BY_PATH = {
+    '/dashboard': 'dashboard',
+    '/certificates': 'certificates-index',
+    '/journal': 'journal',
+    '/staff': 'staff',
+    '/settings': 'settings',
+}
 
 const userOptions = [
     {
@@ -122,10 +183,14 @@ const userOptions = [
 ]
 
 const currentRoute = computed(() => {
-    const route = generateBreadcrumbs(router.page.url)
-    if (route.length > 0)
-        return route[0].key
-    return route
+    const path = router.page.url.split('?')[0]
+    if (CERTIFICATES_KEY_BY_PATH[path])
+        return CERTIFICATES_KEY_BY_PATH[path]
+
+    const crumbs = generateBreadcrumbs(router.page.url)
+    if (crumbs.length > 0)
+        return crumbs[0].key
+    return crumbs
 })
 
 const user = ref(page.props.auth.user)
@@ -169,19 +234,34 @@ onMounted(() => {
     <NaiveLayout>
         <Banner />
 
-        <div class="h-screen max-h-screen bg-gray-100">
+        <div class="h-screen max-h-screen relative overflow-hidden">
             <NLayout position="absolute">
-                <NLayoutHeader class="py-3.5 px-[24px]" bordered>
-                    <NFlex justify="space-between" align="center" class="relative">
-                        <Link href="/" class="flex items-center gap-x-4">
-                            <NImage src="/assets/svg/logo-short.svg" preview-disabled width="32" height="32" class="h-8 w-8" />
-                            <span class="text-lg">
-                                ЭРСП
-                            </span>
-                        </Link>
-                        <NSpace class="-m-5 -mr-[24px]" :size="0" align="center">
+                <NLayoutHeader class="py-3.5 pr-[24px]" bordered>
+                    <NFlex justify="space-between" align="center" class="relative" :wrap="false">
+                        <NFlex justify="space-between" :size="0" class="relative">
+                            <Link href="/" class="flex items-center gap-x-4 flex-none" :style="isLargeScreen ? 'width:260px;padding:0 24px' : 'padding:0 24px'">
+                                <NImage src="/assets/svg/logo-short.svg" preview-disabled width="32" height="32" class="h-8 w-8" />
+                                <span class="text-lg">
+                                    ЭРСП
+                                </span>
+                            </Link>
+                            <div class="border-r border-[var(--n-border-color)] absolute inset-y-0 right-0 -top-1/2 h-[65px]"></div>
+                        </NFlex>
+                        <div class="flex-1 min-w-0 px-4">
+                            <div class="text-base font-semibold leading-tight truncate">{{ activeTitle }}</div>
+                            <NText v-if="subtitle" depth="3" class="text-xs truncate" style="display:block">
+                                {{ subtitle }}
+                            </NText>
+                        </div>
+                        <NFlex align="center" :wrap="false" class="flex-none">
+                            <slot name="headerActions" />
+                        </NFlex>
+                        <NSpace class="-m-5 ml-0 -mr-[24px]" :size="0" align="center">
+                            <NButton title="Сменить тему" @click="toggleTheme">
+                                <NIcon :component="isDark ? IconSun : IconMoon" size="16" />
+                            </NButton>
                             <NDropdown v-if="user && isLargeScreen" trigger="click" placement="top-end" :options="userOptions" @select="(key, option) => option.onClick()">
-                                <NButton quaternary class="h-[61px] rounded-none hidden md:block">
+                                <NButton quaternary class="h-[65px] rounded-none hidden md:block">
                                     <NSpace align="center">
                                         <NSpace vertical align="end" :size="2">
                                             <NText class="font-semibold">
@@ -195,43 +275,21 @@ onMounted(() => {
                                     </NSpace>
                                 </NButton>
                             </NDropdown>
-                            <NButton v-if="!isLargeScreen" quaternary class="h-[61px] w-[61px] rounded-none" @click="mobileMenuCollapsed = true">
+                            <NButton v-if="!isLargeScreen" quaternary class="h-[65px] w-[65px] rounded-none" @click="mobileMenuCollapsed = true">
                                 <NIcon :component="IconMenu3" />
                             </NButton>
                         </NSpace>
                     </NFlex>
                 </NLayoutHeader>
-                <NLayout has-sider position="absolute" style="top: 61px; bottom: 47px">
-                    <NLayoutSider v-if="isLargeScreen" collapse-mode="width" collapsed-width="0" width="260" :collapsed="largeMenuCollapsed" show-trigger @collapse="largeMenuCollapsed = true"
-                                  @expand="largeMenuCollapsed = false" :collapsed-trigger-class="largeMenuCollapsed === true ? '!-right-5 !top-1/4' : ''" trigger-class="!top-1/4" bordered content-class="">
-                        <NMenu :options="menuOptions" :value="currentRoute" />
+                <NLayout has-sider position="absolute" style="top: 65px; bottom: 0;">
+                    <NLayoutSider v-if="isLargeScreen" collapse-mode="width" bordered collapsed-width="0" width="260">
+                        <NMenu :options="menuOptions" :value="currentRoute" :indent="18" />
                     </NLayoutSider>
-                    <NLayout content-class="px-4 py-5 lg:px-14 lg:py-7">
+                    <NLayout content-class="px-4 py-5 lg:px-8 lg:py-2">
                         <main>
-                            <NFlex justify="space-between" align="center" class="mb-5">
-                                <NSpace vertical :size="0">
-                                    <EdsBreadcrumbs v-if="breabcrumbs.length > 0" :items="breabcrumbs" />
-<!--                                    <NBreadcrumb v-if="breabcrumbs.length >= 1">-->
-<!--                                        <template v-for="breadcrumb in breabcrumbs" :key="breadcrumb.label">-->
-<!--                                            <NBreadcrumbItem v-if="!breadcrumb.isLast">-->
-<!--                                                <Link :href="!breadcrumb.isLast ? breadcrumb.href : ''">-->
-<!--                                                    {{ breadcrumb.label }}-->
-<!--                                                </Link>-->
-<!--                                            </NBreadcrumbItem>-->
-<!--                                        </template>-->
-<!--                                    </NBreadcrumb>-->
-                                    <NFlex align="center" justify="start" :size="6">
-<!--                                        <NButton text>-->
-<!--                                            <template #icon>-->
-<!--                                                <NIcon :component="IconArrowLeft" size="28" />-->
-<!--                                            </template>-->
-<!--                                        </NButton>-->
-<!--                                        <NDivider vertical class="!h-[25px] !bg-[#1f2225]" />-->
-                                        <NH1 class="!my-0">
-                                            {{ activeTitle }}
-                                        </NH1>
-                                    </NFlex>
-                                </NSpace>
+                            <NFlex v-if="breabcrumbs.length > 0 || $slots.headermore" justify="space-between" align="center" class="mb-5">
+                                <EdsBreadcrumbs v-if="breabcrumbs.length > 0" :items="breabcrumbs" />
+                                <div v-else />
                                 <NSpace>
                                     <slot name="headermore" />
                                 </NSpace>
@@ -245,7 +303,7 @@ onMounted(() => {
                         </main>
                     </NLayout>
                 </NLayout>
-                <NLayoutFooter
+                <!-- <NLayoutFooter
                     bordered
                     position="absolute"
                     class="p-3 px-[24px]"
@@ -259,7 +317,7 @@ onMounted(() => {
                             {{ processingCertification.message }}
                         </NTag>
                     </NFlex>
-                </NLayoutFooter>
+                </NLayoutFooter> -->
             </NLayout>
         </div>
 
@@ -277,7 +335,7 @@ onMounted(() => {
                         </NSpace>
                     </NFlex>
                 </template>
-                <NMenu :options="menuOptions" :value="currentRoute" />
+                <NMenu :options="menuOptions" :value="currentRoute" :indent="18" />
             </NDrawerContent>
         </NDrawer>
 

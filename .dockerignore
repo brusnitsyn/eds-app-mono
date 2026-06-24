@@ -1,0 +1,14 @@
+.git
+.idea
+node_modules
+vendor
+*.md
+.editorconfig
+.env
+.env.example
+.gitignore
+.gitattributes
+storage/logs/*.log
+docker-compose.yml
+Dockerfile
+.dockerignore

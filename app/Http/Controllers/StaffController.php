@@ -189,9 +189,7 @@ class StaffController extends Controller
             $certificateReader->readSingle($data['certificate']);
         }
 
-        return Inertia::render('Staff/Index', [
-            'staffs' => Staff::all()
-        ]);
+        return back();
     }
 
     public function show(Staff $staff)

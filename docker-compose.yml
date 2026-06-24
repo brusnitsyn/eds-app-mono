@@ -1,82 +1,92 @@
 services:
-    app:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        image: eds-app
-        container_name: eds-app
-        restart: unless-stopped
-        working_dir: /var/www/html
-        volumes:
-            - ./docker/php.ini:/usr/local/etc/php/conf.d/custom.ini
-        networks:
-            - eds-network
-        depends_on:
-            - redis
+  #PHP Service
+  app:
+    image: registry.brusoff.su/eds:2026.06-dev
+    build: .
+    container_name: aokb_onboard_app
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    working_dir: /var/www/html
+    environment:
+      - REDIS_HOST=redis  # Явно указываем имя сервиса Redis
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+    depends_on:
+      - redis
+    volumes:
+      - ./.env:/var/www/html/.env
+      - ./docker/php.ini:/usr/local/etc/php/conf.d/app.ini
+      - ./docker/blocked_ips.map:/etc/nginx/blocked_ips.map
+      - ./storage/logs:/var/www/storage/logs
+    networks:
+      - eds-network
 
-    # Очереди Laravel
-    queue:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        container_name: eds-queue
-        restart: unless-stopped
-        working_dir: /var/www/html
-        volumes:
-            - .:/var/www/html
-        command: php artisan queue:work --sleep=3 --tries=3
-        networks:
-            - eds-network
-        depends_on:
-            - redis
-        environment:
-            - QUEUE_CONNECTION=redis
+  #Queue Worker
+  queue:
+    image: registry.brusoff.su/eds:2026.06-dev
+    build: .
+    container_name: aokb_onboard_queue
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan queue:work redis --queue=default --sleep=3 --tries=3 --timeout=1800
+    environment:
+      - REDIS_HOST=redis  # Явно указываем имя сервиса Redis
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+    depends_on:
+      - redis
+      - app
+    volumes:
+      - ./.env:/var/www/html/.env
+      - ./docker/php.ini:/usr/local/etc/php/conf.d/app.ini
+      - ./storage/logs:/var/www/storage/logs
+    networks:
+      - eds-network
 
-    # Scheduler для задач по расписанию
-    scheduler:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        container_name: eds-scheduler
-        restart: unless-stopped
-        working_dir: /var/www/html
-        volumes:
-            - .:/var/www/html
-        command: >
-            sh -c "echo 'Starting scheduler...' &&
-                   while true; do
-                     php artisan schedule:run --verbose --no-interaction &
-                     sleep 60
-                   done"
-        networks:
-            - eds-network
-        depends_on:
-            - redis
+  #Scheduler (одиночный — планировщик Laravel)
+  scheduler:
+    image: registry.brusoff.su/eds:2026.06-dev
+    build: .
+    container_name: aokb_onboard_scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan schedule:work
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+    depends_on:
+      - redis
+      - app
+    volumes:
+      - ./.env:/var/www/html/.env
+      - ./docker/php.ini:/usr/local/etc/php/conf.d/app.ini
+      - ./storage/logs:/var/www/storage/logs
+    networks:
+      - eds-network
 
-    nginx:
-        image: nginx:alpine
-        container_name: eds-nginx
-        restart: unless-stopped
-        ports:
-            - "30:80"
-        volumes:
-            - .:/var/www/html
-            - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
-        networks:
-            - eds-network
-        depends_on:
-            - app
+  redis:
+    image: redis:8-alpine
+    container_name: aokb_onboard_redis
+    restart: unless-stopped
+    volumes:
+      - eds-redis:/data
+    networks:
+      - eds-network
+    expose:
+      - "6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-    redis:
-        image: redis:alpine
-        container_name: eds-redis
-        restart: unless-stopped
-        volumes:
-            - ./redis_data:/data
-        networks:
-            - eds-network
-        command: redis-server --appendonly yes
-
+#Docker Networks
 networks:
-    eds-network:
-        driver: bridge
+  eds-network:
+    driver: bridge
+
+volumes:
+  eds-redis:
+    driver: local

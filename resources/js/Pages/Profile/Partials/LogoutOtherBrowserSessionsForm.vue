@@ -1,20 +1,16 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
-import ActionSection from '@/Components/ActionSection.vue';
-import DialogModal from '@/Components/DialogModal.vue';
-import InputError from '@/Components/InputError.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import { NButton, NCard, NEmpty, NFlex, NIcon, NInput, NList, NListItem, NTag, NText } from 'naive-ui';
+import { IconDeviceDesktop, IconDeviceMobile } from '@tabler/icons-vue';
+import EdsModal from '@/Components/Eds/EdsModal.vue';
 
 defineProps({
     sessions: Array,
 });
 
 const confirmingLogout = ref(false);
-const passwordInput = ref(null);
+const passwordInputRef = ref(null);
 
 const form = useForm({
     password: '',
@@ -23,119 +19,86 @@ const form = useForm({
 const confirmLogout = () => {
     confirmingLogout.value = true;
 
-    setTimeout(() => passwordInput.value.focus(), 250);
+    setTimeout(() => passwordInputRef.value?.focus(), 250);
 };
 
 const logoutOtherBrowserSessions = () => {
     form.delete(route('other-browser-sessions.destroy'), {
         preserveScroll: true,
-        onSuccess: () => closeModal(),
-        onError: () => passwordInput.value.focus(),
+        onSuccess: () => {
+            closeModal();
+            window.$message?.success('Остальные сеансы завершены');
+        },
+        onError: () => passwordInputRef.value?.focus(),
         onFinish: () => form.reset(),
     });
 };
 
 const closeModal = () => {
     confirmingLogout.value = false;
-
     form.reset();
 };
 </script>
 
 <template>
-    <ActionSection>
-        <template #title>
-            Сеансы
-        </template>
+    <NCard title="Активные сеансы">
+        <NText depth="3" class="text-sm mb-4" style="display: block">
+            При необходимости вы можете выйти из всех своих активных сеансов на других браузерах и устройствах. Список ниже может быть неполным — если считаете, что учётная запись скомпрометирована, также обновите пароль.
+        </NText>
 
-        <template #description>
-            Управляйте и выходите из своих активных сеансов на других браузерах и устройствах.
-        </template>
-
-        <template #content>
-            <div class="max-w-xl text-sm text-gray-600">
-                Если необходимо, вы можете выйти из всех своих активных сеансов во всех браузерах и на всех устройствах. Некоторые из ваших недавних сеансов перечислены ниже; однако этот список может быть неполным. Если вы считаете, что ваша учетная запись была скомпрометирована, вам также следует обновить пароль.
-            </div>
-
-            <!-- Other Browser Sessions -->
-            <div v-if="sessions.length > 0" class="mt-5 space-y-6">
-                <div v-for="(session, i) in sessions" :key="i" class="flex items-center">
-                    <div>
-                        <svg v-if="session.agent.is_desktop" class="size-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
-                        </svg>
-
-                        <svg v-else class="size-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
-                        </svg>
-                    </div>
-
-                    <div class="ms-3">
-                        <div class="text-sm text-gray-600">
-                            {{ session.agent.platform ? session.agent.platform : 'Неизвестное устройство' }} - {{ session.agent.browser ? session.agent.browser : 'Неизвестное устройство' }}
+        <NList v-if="sessions.length > 0" bordered>
+            <NListItem v-for="(session, i) in sessions" :key="i">
+                <NFlex align="center" :size="12" :wrap="false">
+                    <NIcon :component="session.agent.is_desktop ? IconDeviceDesktop : IconDeviceMobile" :size="22" :depth="3" />
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium">
+                            {{ session.agent.platform || 'Неизвестное устройство' }} · {{ session.agent.browser || 'Неизвестный браузер' }}
                         </div>
-
-                        <div>
-                            <div class="text-xs text-gray-500">
-                                {{ session.ip_address }},
-
-                                <span v-if="session.is_current_device" class="text-green-500 font-semibold">Это устройство</span>
-                                <span v-else>Последняя активность {{ session.last_active }}</span>
-                            </div>
-                        </div>
+                        <NFlex align="center" :size="6" class="text-xs text-gray-400 dark:text-white/40">
+                            <span>{{ session.ip_address }}</span>
+                            <NTag v-if="session.is_current_device" type="success" size="small" round>
+                                Это устройство
+                            </NTag>
+                            <span v-else>· {{ session.last_active }}</span>
+                        </NFlex>
                     </div>
-                </div>
-            </div>
+                </NFlex>
+            </NListItem>
+        </NList>
+        <NEmpty v-else description="Нет данных об активных сеансах" />
 
-            <div class="flex items-center mt-5">
-                <PrimaryButton @click="confirmLogout">
-                    Выйти из других сеансов браузера
-                </PrimaryButton>
-
-                <ActionMessage :on="form.recentlySuccessful" class="ms-3">
-                    Done.
-                </ActionMessage>
-            </div>
-
-            <!-- Log Out Other Devices Confirmation Modal -->
-            <DialogModal :show="confirmingLogout" @close="closeModal">
-                <template #title>
-                    Log Out Other Browser Sessions
-                </template>
-
-                <template #content>
-                    Please enter your password to confirm you would like to log out of your other browser sessions across all of your devices.
-
-                    <div class="mt-4">
-                        <TextInput
-                            ref="passwordInput"
-                            v-model="form.password"
-                            type="password"
-                            class="mt-1 block w-3/4"
-                            placeholder="Password"
-                            autocomplete="current-password"
-                            @keyup.enter="logoutOtherBrowserSessions"
-                        />
-
-                        <InputError :message="form.errors.password" class="mt-2" />
-                    </div>
-                </template>
-
-                <template #footer>
-                    <SecondaryButton @click="closeModal">
-                        Cancel
-                    </SecondaryButton>
-
-                    <PrimaryButton
-                        class="ms-3"
-                        :class="{ 'opacity-25': form.processing }"
-                        :disabled="form.processing"
-                        @click="logoutOtherBrowserSessions"
-                    >
-                        Log Out Other Browser Sessions
-                    </PrimaryButton>
-                </template>
-            </DialogModal>
+        <template #footer>
+            <NButton @click="confirmLogout">
+                Завершить другие сеансы
+            </NButton>
         </template>
-    </ActionSection>
+    </NCard>
+
+    <EdsModal v-model:show="confirmingLogout" title="Выход из других сеансов" @after-leave="closeModal">
+        <NText depth="3" class="text-sm mb-3" style="display: block">
+            Введите пароль, чтобы подтвердить выход из других сеансов браузера на всех ваших устройствах.
+        </NText>
+
+        <NInput
+            ref="passwordInputRef"
+            v-model:value="form.password"
+            type="password"
+            show-password-on="click"
+            placeholder="Пароль"
+            autocomplete="current-password"
+            @keyup.enter="logoutOtherBrowserSessions"
+        />
+        <NText v-if="form.errors.password" type="error" class="text-xs mt-1" style="display: block">
+            {{ form.errors.password }}
+        </NText>
+
+        <NFlex justify="end" class="mt-4">
+            <NButton @click="closeModal">
+                Отмена
+            </NButton>
+            <NButton type="primary" :loading="form.processing" :disabled="form.processing" @click="logoutOtherBrowserSessions">
+                Завершить сеансы
+            </NButton>
+        </NFlex>
+    </EdsModal>
 </template>

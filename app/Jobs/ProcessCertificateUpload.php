@@ -6,6 +6,7 @@ use App\Actions\Eds\CreateNewStaff;
 use App\Events\CertificateProcessingEvent;
 use App\Facades\Crypto;
 use App\Models\Staff;
+use App\Services\PythonCertificateParserService;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,11 +18,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PhpZip\ZipFile;
 
 class ProcessCertificateUpload implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
+
+    /**
+     * Детерминированные проверки (целостность/цепочка/CRL) при провале не имеет
+     * смысла повторять — повтор даст тот же результат и продублирует broadcast.
+     */
+    public $tries = 1;
 
     protected $extractedCertificatePath;
 
@@ -30,64 +36,200 @@ class ProcessCertificateUpload implements ShouldQueue
         $this->extractedCertificatePath = $extractedCertificatePath;
     }
 
-    public function handle(): void
+    public function handle(PythonCertificateParserService $pythonCertificateParser): void
     {
         $extractedFiles = Storage::disk('temp')->allFiles($this->extractedCertificatePath);
 
-        // Ищем файл сертификата (.cer)
-        $cerFile = collect($extractedFiles)->first(function ($file) {
-            return pathinfo($file, PATHINFO_EXTENSION) === 'cer';
-        });
+        // ---- Этап 1: целостность контейнера ----
+        $this->broadcastStage('running', 'info', 'Проверка целостности контейнера…', 'container');
 
+        $cerFile = collect($extractedFiles)->first(
+            fn ($file) => pathinfo($file, PATHINFO_EXTENSION) === 'cer'
+        );
         if (!$cerFile) {
-            Log::error('Не найден файл сертификата (.cer)');
-            return;
+            $this->fail('container', 'В архиве не найден файл сертификата (.cer)');
         }
 
-        // Читаем информацию из сертификата
-        $certContents = file_get_contents(Storage::disk('temp')->path($cerFile));
-        $certificateCAPemContent = '-----BEGIN CERTIFICATE-----' . PHP_EOL
+        $hasKeyContainer = collect($extractedFiles)->contains(
+            fn ($file) => basename($file) === 'header.key'
+        );
+        if (!$hasKeyContainer) {
+            $this->fail('container', 'В архиве не найден контейнер закрытого ключа КриптоПро (header.key)');
+        }
+
+        $tempCertificatePath = Storage::disk('temp')->path($cerFile);
+        $certContents = file_get_contents($tempCertificatePath);
+        $certificatePemContent = '-----BEGIN CERTIFICATE-----' . PHP_EOL
             . chunk_split(base64_encode($certContents), 64, PHP_EOL)
             . '-----END CERTIFICATE-----' . PHP_EOL;
 
-        $parsedCert = openssl_x509_parse($certificateCAPemContent);
-        $validToTimestamp = Carbon::parse($parsedCert['validTo_time_t'])->getTimestampMs();
-        $snils = $parsedCert['subject']['SNILS']; // Получаем СНИЛС пользователя из сертификата
-
-        $staff = Staff::whereSnils($snils)->first();
-        if ($staff && $staff->certification->valid_to > $validToTimestamp) {
-            Log::info('Сертификат устаревший, пропускаем пакет');
-            return; // Пропускаем пакет, так как сертификат устаревший
+        $parsedCert = @openssl_x509_parse($certificatePemContent);
+        if ($parsedCert === false) {
+            $this->fail('container', 'Не удалось разобрать структуру сертификата (некорректный X.509)');
         }
 
-        // Короткое имя папки
-        $folderName = hash('md5', $snils);
+        try {
+            $pythonParsedCert = $pythonCertificateParser->parse($tempCertificatePath);
+        } catch (\Throwable $e) {
+            $this->fail('container', 'Ошибка Python-парсера сертификатов: ' . $e->getMessage());
+        }
 
-        // Создаем папку с именем пользователя
-        $destinationPath = "$folderName";
+        $serialNumber = $pythonParsedCert['serial_number'] ?? null;
+        if (!is_string($serialNumber) || $serialNumber === '') {
+            $this->fail('container', 'Не удалось получить серийный номер сертификата');
+        }
+
+        $this->broadcastStage('done', 'success', 'Целостность контейнера подтверждена', 'container');
+
+        // ---- Этап 2: цепочка доверия ----
+        $this->broadcastStage('running', 'info', 'Проверка цепочки доверия…', 'chain');
+        $chain = $this->checkTrustChain($parsedCert['issuer']['CN'] ?? null);
+        $this->broadcastStage($chain['status'], $chain['type'], $chain['message'], 'chain');
+        if ($chain['status'] === 'failed') {
+            throw new \RuntimeException($chain['message']);
+        }
+
+        // ---- Этап 3: проверка по списку отзыва (CRL) ----
+        $this->broadcastStage('running', 'info', 'Проверка по списку отзыва (CRL)…', 'crl');
+        $crl = $this->describeRevocation($pythonParsedCert['revocation'] ?? null);
+        $this->broadcastStage($crl['status'], $crl['type'], $crl['message'], 'crl');
+        if ($crl['status'] === 'failed') {
+            throw new \RuntimeException($crl['message']);
+        }
+
+        // ---- Сохранение ----
+        $validToTimestamp = Carbon::parse($parsedCert['validTo_time_t'])->getTimestampMs();
+        $snils = $parsedCert['subject']['SNILS'] ?? null;
+
+        $staff = Staff::whereSnils($snils)->first();
+        if ($staff && $staff->certification && $staff->certification->valid_to > $validToTimestamp) {
+            Log::info('Сертификат устаревший, пропускаем пакет');
+            $this->broadcastStage('done', 'success', 'В реестре уже есть более новый сертификат сотрудника', 'save', [
+                'full_name' => $staff->full_name,
+                'job_title' => $staff->job_title,
+                'snils' => $staff->snils,
+                'serial_number' => $staff->certification->serial_number,
+                'valid_from' => $staff->certification->valid_from,
+                'valid_to' => $staff->certification->valid_to,
+            ]);
+
+            return;
+        }
+
+        $destinationPath = hash('md5', $snils);
         $this->moveDirectoryToStorage($this->extractedCertificatePath, $destinationPath);
 
-        // Получаем путь к файлу сертификата в постоянном хранилище
         $certificateFile = Storage::disk('certification')->path("$destinationPath/" . basename($cerFile));
-
-        // Читаем информацию из сертификата
-        $certificationInfo = $this->read($certificateFile);
-
-        // Добавляем путь к сертификату и ключам в результат
+        $certificationInfo = $this->buildCertificationInfo($certificateFile, $parsedCert, $serialNumber);
         $certificationInfo['certificate']['path_certification'] = $destinationPath;
         $certificationInfo['certificate']['file_certification'] = basename($cerFile);
 
-        // Сохраняем информацию в базу данных
         DB::transaction(function () use ($certificationInfo) {
             $createdStaff = new CreateNewStaff();
             $createdStaff->create($certificationInfo);
         });
 
-        // Шифруем все файлы в папке
         $this->encryptFilesInDirectory($destinationPath);
-
-        // Удаляем временные файлы
         Storage::disk('temp')->deleteDirectory($this->extractedCertificatePath);
+
+        $this->broadcastStage('done', 'success', "Сертификат сотрудника «{$certificationInfo['full_name']}» сохранён в реестре", 'save', [
+            'full_name' => $certificationInfo['full_name'],
+            'job_title' => $certificationInfo['job_title'],
+            'snils' => $certificationInfo['snils'],
+            'serial_number' => $certificationInfo['certificate']['serial_number'],
+            'valid_from' => $certificationInfo['certificate']['valid_from'],
+            'valid_to' => $certificationInfo['certificate']['valid_to'],
+        ]);
+    }
+
+    private function broadcastStage(string $status, string $type, string $message, string $stage, array $data = []): void
+    {
+        broadcast(new CertificateProcessingEvent($status, $type, $message, $stage, $data));
+    }
+
+    /**
+     * Логирует и транслирует провал этапа, затем прерывает обработку.
+     *
+     * @throws \RuntimeException
+     */
+    private function fail(string $stage, string $message): void
+    {
+        Log::error($message);
+        $this->broadcastStage('failed', 'error', $message, $stage);
+
+        throw new \RuntimeException($message);
+    }
+
+    /**
+     * Сверяет издателя сертификата со списком аккредитованных УЦ организации
+     * (config('services.certificate_parser.trusted_issuers')). Список пуст по
+     * умолчанию — пока он не настроен, честно сообщаем об этом, а не подделываем
+     * результат проверки.
+     */
+    private function checkTrustChain(?string $issuerCn): array
+    {
+        $trusted = config('services.certificate_parser.trusted_issuers', []);
+
+        if (empty($trusted)) {
+            return [
+                'status' => 'warning',
+                'type' => 'warning',
+                'message' => 'Список аккредитованных УЦ не настроен — издатель «' . ($issuerCn ?: '—') . '» не сверен',
+            ];
+        }
+
+        if ($issuerCn && in_array($issuerCn, $trusted, true)) {
+            return [
+                'status' => 'done',
+                'type' => 'success',
+                'message' => "Издатель «{$issuerCn}» входит в список аккредитованных УЦ",
+            ];
+        }
+
+        return [
+            'status' => 'failed',
+            'type' => 'error',
+            'message' => 'Издатель «' . ($issuerCn ?: '—') . '» не найден в списке аккредитованных УЦ',
+        ];
+    }
+
+    /**
+     * Интерпретирует результат CRL-проверки из Python-парсера. Отказ сервиса
+     * CRL (нет сети, нет точки распространения и т.п.) — это предупреждение,
+     * а не блокирующая ошибка (fail-open): подтверждённый отзыв — единственная
+     * причина останавливать загрузку.
+     */
+    private function describeRevocation(?array $revocation): array
+    {
+        if (!$revocation) {
+            return [
+                'status' => 'warning',
+                'type' => 'warning',
+                'message' => 'Сведения CRL недоступны: парсер не вернул результат проверки',
+            ];
+        }
+
+        if ($revocation['revoked'] ?? false) {
+            return [
+                'status' => 'failed',
+                'type' => 'error',
+                'message' => 'Сертификат отозван удостоверяющим центром (по данным CRL)',
+            ];
+        }
+
+        if (!($revocation['checked'] ?? false)) {
+            return [
+                'status' => 'warning',
+                'type' => 'warning',
+                'message' => 'Не удалось проверить список отзыва: ' . ($revocation['error'] ?? 'сервис CRL недоступен'),
+            ];
+        }
+
+        return [
+            'status' => 'done',
+            'type' => 'success',
+            'message' => 'Сертификат не найден в списке отзыва CRL',
+        ];
     }
 
     private function moveDirectoryToStorage($sourcePath, $destinationPath): void
@@ -113,7 +255,7 @@ class ProcessCertificateUpload implements ShouldQueue
         }
     }
 
-    private function read($certificateFile): array
+    private function buildCertificationInfo($certificateFile, array $parsedCert, string $serialNumber): array
     {
         $certificateDir = pathinfo($certificateFile, PATHINFO_DIRNAME);
         $closeKeyValidTo = null;
@@ -128,40 +270,16 @@ class ProcessCertificateUpload implements ShouldQueue
                 if (preg_match($patternNew, $closeKeyContent, $matches)) {
                     $dateString = $matches[0];
                     $closeKeyValidTo = Carbon::createFromFormat('ymdHis\Z', rtrim($dateString, 0), 'UTC')->getTimestampMs();
-                    break; // Если нашли дату, выходим из цикла
+                    break;
                 }
                 if (preg_match($pattern, $closeKeyContent, $matches)) {
                     $dateString = $matches[0];
                     $closeKeyValidTo = Carbon::createFromFormat('YmdHis\Z', $dateString, 'UTC')->getTimestampMs();
-                    break; // Если нашли дату, выходим из цикла
+                    break;
                 }
             } catch (\Exception $e) {
                 Log::error("Ошибка при чтении файла: $closeKeyFile", ['error' => $e->getMessage()]);
             }
-        }
-
-        $certContents = file_get_contents($certificateFile);
-
-        $certificateCAPemContent = '-----BEGIN CERTIFICATE-----' . PHP_EOL
-            . chunk_split(base64_encode($certContents), 64, PHP_EOL)
-            . '-----END CERTIFICATE-----' . PHP_EOL;
-
-        $parsedCert = openssl_x509_parse($certificateCAPemContent);
-
-        $serialNumber = $parsedCert['serialNumber'];
-        if (intval($serialNumber)) {
-            $serialNumber = strtoupper($this->bcdechex($parsedCert['serialNumber']));
-
-            if (hexdec(substr($serialNumber, 0, 2)) >= 0x80) {
-                $serialNumber = '00' . $serialNumber;
-            }
-
-            if (strlen($serialNumber) % 2 !== 0) {
-                $serialNumber = '0' . $serialNumber;
-            }
-        }
-        if (Str::contains($serialNumber, '0x')) {
-            $serialNumber = Str::replace('0x', '00', $serialNumber);
         }
 
         $parsedSubject = $parsedCert['subject'];
@@ -178,7 +296,7 @@ class ProcessCertificateUpload implements ShouldQueue
                 'serial_number' => $serialNumber,
                 'valid_from' => Carbon::parse($parsedCert['validFrom_time_t'])->getTimestampMs(),
                 'valid_to' => Carbon::parse($parsedCert['validTo_time_t'])->getTimestampMs(),
-                'close_key_valid_to' => $closeKeyValidTo
+                'close_key_valid_to' => $closeKeyValidTo,
             ],
             'job_title' => $job_title,
             'full_name' => $full_name,
@@ -186,18 +304,7 @@ class ProcessCertificateUpload implements ShouldQueue
             'middle_name' => $middle_name,
             'last_name' => $last_name,
             'snils' => $parsedSubject['SNILS'],
-            'inn' => $parsedSubject['INN']
+            'inn' => $parsedSubject['INN'],
         ];
-    }
-
-    private function bcdechex($dec): string
-    {
-        $last = bcmod($dec, 16);
-        $remain = bcdiv(bcsub($dec, $last), 16);
-        if($remain == 0) {
-            return dechex($last);
-        } else {
-            return $this->bcdechex($remain).dechex($last);
-        }
     }
 }

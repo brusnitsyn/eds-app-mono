@@ -1,13 +1,8 @@
 <script setup>
 import { ref } from 'vue';
-import { Link, router, useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
-import FormSection from '@/Components/FormSection.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import { router, useForm } from '@inertiajs/vue3';
+import { NAvatar, NButton, NCard, NFlex, NForm, NFormItemGi, NGrid, NIcon, NInput, NTag, NText, NUpload } from 'naive-ui';
+import { IconCamera } from '@tabler/icons-vue';
 
 const props = defineProps({
     user: Object,
@@ -20,42 +15,30 @@ const form = useForm({
     photo: null,
 });
 
-const verificationLinkSent = ref(null);
 const photoPreview = ref(null);
-const photoInput = ref(null);
 
 const updateProfileInformation = () => {
-    if (photoInput.value) {
-        form.photo = photoInput.value.files[0];
-    }
-
     form.post(route('user-profile-information.update'), {
         errorBag: 'updateProfileInformation',
         preserveScroll: true,
-        onSuccess: () => clearPhotoFileInput(),
+        onSuccess: () => {
+            window.$message?.success('Профиль обновлён');
+        },
     });
 };
 
-const sendEmailVerification = () => {
-    verificationLinkSent.value = true;
-};
+const onPhotoChange = ({ fileList }) => {
+    const file = fileList[fileList.length - 1]?.file;
 
-const selectNewPhoto = () => {
-    photoInput.value.click();
-};
+    if (! file) return;
 
-const updatePhotoPreview = () => {
-    const photo = photoInput.value.files[0];
-
-    if (! photo) return;
+    form.photo = file;
 
     const reader = new FileReader();
-
     reader.onload = (e) => {
         photoPreview.value = e.target.result;
     };
-
-    reader.readAsDataURL(photo);
+    reader.readAsDataURL(file);
 };
 
 const deletePhoto = () => {
@@ -63,124 +46,83 @@ const deletePhoto = () => {
         preserveScroll: true,
         onSuccess: () => {
             photoPreview.value = null;
-            clearPhotoFileInput();
+            form.photo = null;
         },
     });
-};
-
-const clearPhotoFileInput = () => {
-    if (photoInput.value?.value) {
-        photoInput.value.value = null;
-    }
 };
 </script>
 
 <template>
-    <FormSection @submitted="updateProfileInformation">
-        <template #title>
-            Информация о профиле
-        </template>
-
-        <template #description>
-            Обновите информацию профиля и адрес электронной почты вашей учетной записи.
-        </template>
-
-        <template #form>
-            <!-- Profile Photo -->
-            <div v-if="$page.props.jetstream.managesProfilePhotos" class="col-span-6 sm:col-span-4">
-                <!-- Profile Photo File Input -->
-                <input
-                    id="photo"
-                    ref="photoInput"
-                    type="file"
-                    class="hidden"
-                    @change="updatePhotoPreview"
+    <NCard>
+        <NFlex :size="20" align="start" :wrap="false">
+            <div class="flex-none text-center">
+                <NUpload
+                    v-if="$page.props.jetstream.managesProfilePhotos"
+                    :max="1"
+                    :default-upload="false"
+                    :show-file-list="false"
+                    accept="image/png,image/jpeg"
+                    @change="onPhotoChange"
                 >
+                    <div class="relative cursor-pointer group">
+                        <NAvatar :size="84" round :src="photoPreview || user.profile_photo_url" :object-fit="'cover'" />
+                        <div class="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+                            <NIcon :component="IconCamera" :size="20" class="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                    </div>
+                </NUpload>
+                <NAvatar v-else :size="84" round :src="user.profile_photo_url" :object-fit="'cover'" />
 
-                <InputLabel for="photo" value="Photo" />
-
-                <!-- Current Profile Photo -->
-                <div v-show="! photoPreview" class="mt-2">
-                    <img :src="user.profile_photo_url" :alt="user.name" class="rounded-full size-20 object-cover">
+                <div v-if="form.errors.photo" class="text-xs text-red-500 mt-2 max-w-[84px]">
+                    {{ form.errors.photo }}
                 </div>
 
-                <!-- New Profile Photo Preview -->
-                <div v-show="photoPreview" class="mt-2">
-                    <span
-                        class="block rounded-full size-20 bg-cover bg-no-repeat bg-center"
-                        :style="'background-image: url(\'' + photoPreview + '\');'"
-                    />
-                </div>
-
-                <SecondaryButton class="mt-2 me-2" type="button" @click.prevent="selectNewPhoto">
-                    Select A New Photo
-                </SecondaryButton>
-
-                <SecondaryButton
-                    v-if="user.profile_photo_path"
-                    type="button"
+                <NButton
+                    v-if="$page.props.jetstream.managesProfilePhotos && user.profile_photo_path"
+                    text
+                    type="error"
+                    size="tiny"
                     class="mt-2"
                     @click.prevent="deletePhoto"
                 >
-                    Remove Photo
-                </SecondaryButton>
-
-                <InputError :message="form.errors.photo" class="mt-2" />
+                    Удалить фото
+                </NButton>
             </div>
 
-            <!-- Имя -->
-            <NFormItemGi label="Имя" span="6" class="col-span-6 sm:col-span-4">
-                <NInput
-                    id="name"
-                    v-model:value="form.name"
-                    type="text"
-                    autocomplete="name"
-                />
-            </NFormItemGi>
+            <div class="flex-1 min-w-0">
+                <NFlex align="center" :size="8" class="mb-4">
+                    <NText class="text-base font-semibold">
+                        {{ user.name }}
+                    </NText>
+                    <NTag v-if="user.role?.name" size="small" round type="primary">
+                        {{ user.role.name }}
+                    </NTag>
+                </NFlex>
 
-<!--            &lt;!&ndash; Email &ndash;&gt;-->
-<!--            <div class="col-span-6 sm:col-span-4">-->
-<!--                <InputLabel for="email" value="Email" />-->
-<!--                <TextInput-->
-<!--                    id="email"-->
-<!--                    v-model="form.email"-->
-<!--                    type="email"-->
-<!--                    class="mt-1 block w-full"-->
-<!--                    required-->
-<!--                    autocomplete="username"-->
-<!--                />-->
-<!--                <InputError :message="form.errors.email" class="mt-2" />-->
+                <NForm label-placement="top" :model="form" @submit.prevent="updateProfileInformation">
+                    <NGrid cols="1 m:2" :x-gap="16" responsive="screen">
+                        <NFormItemGi label="Имя" :feedback="form.errors.name" :validation-status="form.errors.name ? 'error' : undefined">
+                            <NInput id="name" v-model:value="form.name" type="text" autocomplete="name" />
+                        </NFormItemGi>
 
-<!--                <div v-if="$page.props.jetstream.hasEmailVerification && user.email_verified_at === null">-->
-<!--                    <p class="text-sm mt-2">-->
-<!--                        Your email address is unverified.-->
+                        <NFormItemGi label="Email" :feedback="form.errors.email" :validation-status="form.errors.email ? 'error' : undefined">
+                            <NInput id="email" v-model:value="form.email" type="text" autocomplete="email" />
+                        </NFormItemGi>
+                    </NGrid>
+                </NForm>
 
-<!--                        <Link-->
-<!--                            :href="route('verification.send')"-->
-<!--                            method="post"-->
-<!--                            as="button"-->
-<!--                            class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"-->
-<!--                            @click.prevent="sendEmailVerification"-->
-<!--                        >-->
-<!--                            Click here to re-send the verification email.-->
-<!--                        </Link>-->
-<!--                    </p>-->
+                <NText depth="3" class="text-xs">
+                    Логин для входа: {{ user.login }}
+                </NText>
+            </div>
+        </NFlex>
 
-<!--                    <div v-show="verificationLinkSent" class="mt-2 font-medium text-sm text-green-600">-->
-<!--                        A new verification link has been sent to your email address.-->
-<!--                    </div>-->
-<!--                </div>-->
-<!--            </div>-->
+        <template #footer>
+            <NFlex justify="end">
+                <NButton type="primary" attr-type="submit" :loading="form.processing" :disabled="form.processing" @click="updateProfileInformation">
+                    Сохранить
+                </NButton>
+            </NFlex>
         </template>
-
-        <template #actions>
-            <ActionMessage :on="form.recentlySuccessful" class="me-3">
-                Saved.
-            </ActionMessage>
-
-            <NButton type="primary" attr-type="submit" :loading="form.processing" :disabled="form.processing">
-                Сохранить
-            </NButton>
-        </template>
-    </FormSection>
+    </NCard>
 </template>

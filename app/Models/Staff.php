@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\MisTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
@@ -47,7 +48,9 @@ class Staff extends Model
 
     public function makeSearchableUsing(Collection $models): Collection
     {
-        return $models->load('certification');
+        return $models->load(['certification' => function ($query) {
+            $query->latest();
+        }]);
     }
 
     /**
@@ -67,8 +70,8 @@ class Staff extends Model
             'last_name' => Str::lower($this->last_name),
             'full_name' => Str::lower($this->full_name),
             'job_title' => Str::lower($this->job_title),
-            'certification.valid_to' => !empty($this->certification) ? $this->certification->latest()->first()->valid_to : null,
-            'certification.close_key_valid_to' => !empty($this->certification) ? $this->certification->latest()->first()->close_key_valid_to : null,
+            'certification.valid_to' => $this->certification ? (int) Carbon::createFromTimestampMs($this->certification->latest()->first()?->valid_to)->timestamp : null,
+            'certification.close_key_valid_to' => $this->certification ? (int) Carbon::createFromTimestampMs($this->certification->latest()->first()?->close_key_valid_to)->timestamp : null,
             'inn' => $this->inn,
             'snils' => $this->snils,
             'created_at' => (int) $this->created_at->timestamp,

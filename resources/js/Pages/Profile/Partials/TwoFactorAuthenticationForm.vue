@@ -1,14 +1,10 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import ActionSection from '@/Components/ActionSection.vue';
-import ConfirmsPassword from '@/Components/ConfirmsPassword.vue';
-import DangerButton from '@/Components/DangerButton.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import { useClipboard } from '@vueuse/core';
+import { NAlert, NButton, NCard, NFlex, NIcon, NInput, NTag, NText } from 'naive-ui';
+import { IconCopy } from '@tabler/icons-vue';
+import EdsModal from '@/Components/Eds/EdsModal.vue';
 
 const props = defineProps({
     requiresConfirmation: Boolean,
@@ -37,6 +33,57 @@ watch(twoFactorEnabled, () => {
     }
 });
 
+// Перед чувствительными действиями (включение/отключение 2ФА, генерация кодов
+// восстановления) проверяем, не подтверждён ли пароль уже в этой сессии —
+// и только если нет, показываем модалку подтверждения.
+const passwordModal = ref(false);
+const passwordInputRef = ref(null);
+const passwordForm = reactive({
+    password: '',
+    error: '',
+    processing: false,
+});
+let pendingAction = null;
+
+const withPasswordConfirmation = (action) => {
+    axios.get(route('password.confirmation')).then(({ data }) => {
+        if (data.confirmed) {
+            action();
+            return;
+        }
+
+        pendingAction = action;
+        passwordModal.value = true;
+        setTimeout(() => passwordInputRef.value?.focus(), 250);
+    });
+};
+
+const confirmPassword = () => {
+    passwordForm.processing = true;
+
+    axios.post(route('password.confirm'), {
+        password: passwordForm.password,
+    }).then(() => {
+        passwordModal.value = false;
+
+        const action = pendingAction;
+        pendingAction = null;
+        action?.();
+    }).catch((error) => {
+        passwordForm.error = error.response?.data?.errors?.password?.[0];
+        passwordInputRef.value?.focus();
+    }).finally(() => {
+        passwordForm.processing = false;
+    });
+};
+
+const closePasswordModal = () => {
+    passwordModal.value = false;
+    passwordForm.password = '';
+    passwordForm.error = '';
+    pendingAction = null;
+};
+
 const enableTwoFactorAuthentication = () => {
     enabling.value = true;
 
@@ -64,7 +111,7 @@ const showSetupKey = () => {
     return axios.get(route('two-factor.secret-key')).then(response => {
         setupKey.value = response.data.secretKey;
     });
-}
+};
 
 const showRecoveryCodes = () => {
     return axios.get(route('two-factor.recovery-codes')).then(response => {
@@ -74,13 +121,14 @@ const showRecoveryCodes = () => {
 
 const confirmTwoFactorAuthentication = () => {
     confirmationForm.post(route('two-factor.confirm'), {
-        errorBag: "confirmTwoFactorAuthentication",
+        errorBag: 'confirmTwoFactorAuthentication',
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => {
             confirming.value = false;
             qrCode.value = null;
             setupKey.value = null;
+            window.$message?.success('Двухфакторная аутентификация подключена');
         },
     });
 };
@@ -88,7 +136,10 @@ const confirmTwoFactorAuthentication = () => {
 const regenerateRecoveryCodes = () => {
     axios
         .post(route('two-factor.recovery-codes'))
-        .then(() => showRecoveryCodes());
+        .then(() => {
+            showRecoveryCodes();
+            window.$message?.success('Коды восстановления обновлены');
+        });
 };
 
 const disableTwoFactorAuthentication = () => {
@@ -99,155 +150,139 @@ const disableTwoFactorAuthentication = () => {
         onSuccess: () => {
             disabling.value = false;
             confirming.value = false;
+            window.$message?.success('Двухфакторная аутентификация отключена');
         },
     });
+};
+
+const { copy } = useClipboard();
+
+const copySetupKey = () => {
+    copy(setupKey.value);
+    window.$message?.success('Ключ скопирован');
 };
 </script>
 
 <template>
-    <ActionSection>
-        <template #title>
-            Two Factor Authentication
+    <NCard title="Двухфакторная аутентификация">
+        <template #header-extra>
+            <NTag :type="twoFactorEnabled && ! confirming ? 'success' : 'default'" round size="small">
+                {{ twoFactorEnabled && ! confirming ? 'Включена' : 'Отключена' }}
+            </NTag>
         </template>
 
-        <template #description>
-            Add additional security to your account using two factor authentication.
-        </template>
+        <NText depth="3" class="text-sm" style="display: block">
+            При включении двухфакторной аутентификации во время входа потребуется ввести безопасный случайный код. Этот код можно получить в приложении-аутентификаторе на телефоне.
+        </NText>
 
-        <template #content>
-            <h3 v-if="twoFactorEnabled && ! confirming" class="text-lg font-medium text-gray-900">
-                You have enabled two factor authentication.
-            </h3>
+        <template v-if="twoFactorEnabled">
+            <div v-if="qrCode" class="mt-4">
+                <NAlert :type="confirming ? 'warning' : 'success'" :show-icon="false" class="mb-4">
+                    <template v-if="confirming">
+                        Чтобы закончить включение двухфакторной аутентификации, отсканируйте QR-код приложением-аутентификатором или введите ключ настройки, затем укажите сгенерированный код.
+                    </template>
+                    <template v-else>
+                        Двухфакторная аутентификация включена. QR-код и ключ настройки можно использовать для подключения дополнительных устройств.
+                    </template>
+                </NAlert>
 
-            <h3 v-else-if="twoFactorEnabled && confirming" class="text-lg font-medium text-gray-900">
-                Finish enabling two factor authentication.
-            </h3>
+                <div class="inline-block p-3 bg-white rounded-lg border dark:border-white/10" v-html="qrCode" />
 
-            <h3 v-else class="text-lg font-medium text-gray-900">
-                You have not enabled two factor authentication.
-            </h3>
-
-            <div class="mt-3 max-w-xl text-sm text-gray-600">
-                <p>
-                    When two factor authentication is enabled, you will be prompted for a secure, random token during authentication. You may retrieve this token from your phone's Google Authenticator application.
-                </p>
-            </div>
-
-            <div v-if="twoFactorEnabled">
-                <div v-if="qrCode">
-                    <div class="mt-4 max-w-xl text-sm text-gray-600">
-                        <p v-if="confirming" class="font-semibold">
-                            To finish enabling two factor authentication, scan the following QR code using your phone's authenticator application or enter the setup key and provide the generated OTP code.
-                        </p>
-
-                        <p v-else>
-                            Two factor authentication is now enabled. Scan the following QR code using your phone's authenticator application or enter the setup key.
-                        </p>
-                    </div>
-
-                    <div class="mt-4 p-2 inline-block bg-white" v-html="qrCode" />
-
-                    <div v-if="setupKey" class="mt-4 max-w-xl text-sm text-gray-600">
-                        <p class="font-semibold">
-                            Setup Key: <span v-html="setupKey"></span>
-                        </p>
-                    </div>
-
-                    <div v-if="confirming" class="mt-4">
-                        <InputLabel for="code" value="Code" />
-
-                        <TextInput
-                            id="code"
-                            v-model="confirmationForm.code"
-                            type="text"
-                            name="code"
-                            class="block mt-1 w-1/2"
-                            inputmode="numeric"
-                            autofocus
-                            autocomplete="one-time-code"
-                            @keyup.enter="confirmTwoFactorAuthentication"
-                        />
-
-                        <InputError :message="confirmationForm.errors.code" class="mt-2" />
-                    </div>
+                <div v-if="setupKey" class="mt-3 text-sm">
+                    <NFlex align="center" :size="6">
+                        <NText depth="3">Ключ настройки:</NText>
+                        <NText code>{{ setupKey }}</NText>
+                        <NButton text size="tiny" @click="copySetupKey">
+                            <template #icon>
+                                <NIcon :component="IconCopy" />
+                            </template>
+                        </NButton>
+                    </NFlex>
                 </div>
 
-                <div v-if="recoveryCodes.length > 0 && ! confirming">
-                    <div class="mt-4 max-w-xl text-sm text-gray-600">
-                        <p class="font-semibold">
-                            Store these recovery codes in a secure password manager. They can be used to recover access to your account if your two factor authentication device is lost.
-                        </p>
-                    </div>
-
-                    <div class="grid gap-1 max-w-xl mt-4 px-4 py-4 font-mono text-sm bg-gray-100 rounded-lg">
-                        <div v-for="code in recoveryCodes" :key="code">
-                            {{ code }}
-                        </div>
-                    </div>
+                <div v-if="confirming" class="mt-4 max-w-xs">
+                    <NInput
+                        v-model:value="confirmationForm.code"
+                        placeholder="Код из приложения"
+                        inputmode="numeric"
+                        autofocus
+                        autocomplete="one-time-code"
+                        @keyup.enter="confirmTwoFactorAuthentication"
+                    />
+                    <NText v-if="confirmationForm.errors.code" type="error" class="text-xs mt-1" style="display: block">
+                        {{ confirmationForm.errors.code }}
+                    </NText>
                 </div>
             </div>
 
-            <div class="mt-5">
-                <div v-if="! twoFactorEnabled">
-                    <ConfirmsPassword @confirmed="enableTwoFactorAuthentication">
-                        <PrimaryButton type="button" :class="{ 'opacity-25': enabling }" :disabled="enabling">
-                            Enable
-                        </PrimaryButton>
-                    </ConfirmsPassword>
-                </div>
-
-                <div v-else>
-                    <ConfirmsPassword @confirmed="confirmTwoFactorAuthentication">
-                        <PrimaryButton
-                            v-if="confirming"
-                            type="button"
-                            class="me-3"
-                            :class="{ 'opacity-25': enabling }"
-                            :disabled="enabling"
-                        >
-                            Confirm
-                        </PrimaryButton>
-                    </ConfirmsPassword>
-
-                    <ConfirmsPassword @confirmed="regenerateRecoveryCodes">
-                        <SecondaryButton
-                            v-if="recoveryCodes.length > 0 && ! confirming"
-                            class="me-3"
-                        >
-                            Regenerate Recovery Codes
-                        </SecondaryButton>
-                    </ConfirmsPassword>
-
-                    <ConfirmsPassword @confirmed="showRecoveryCodes">
-                        <SecondaryButton
-                            v-if="recoveryCodes.length === 0 && ! confirming"
-                            class="me-3"
-                        >
-                            Show Recovery Codes
-                        </SecondaryButton>
-                    </ConfirmsPassword>
-
-                    <ConfirmsPassword @confirmed="disableTwoFactorAuthentication">
-                        <SecondaryButton
-                            v-if="confirming"
-                            :class="{ 'opacity-25': disabling }"
-                            :disabled="disabling"
-                        >
-                            Cancel
-                        </SecondaryButton>
-                    </ConfirmsPassword>
-
-                    <ConfirmsPassword @confirmed="disableTwoFactorAuthentication">
-                        <DangerButton
-                            v-if="! confirming"
-                            :class="{ 'opacity-25': disabling }"
-                            :disabled="disabling"
-                        >
-                            Disable
-                        </DangerButton>
-                    </ConfirmsPassword>
+            <div v-if="recoveryCodes.length > 0 && ! confirming" class="mt-4">
+                <NAlert type="info" :show-icon="false" class="mb-3">
+                    Сохраните эти коды восстановления в надёжном менеджере паролей. Они помогут восстановить доступ к аккаунту, если устройство аутентификации будет потеряно.
+                </NAlert>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 p-4 rounded-lg bg-gray-100 dark:bg-white/5 font-mono text-sm">
+                    <div v-for="code in recoveryCodes" :key="code">
+                        {{ code }}
+                    </div>
                 </div>
             </div>
         </template>
-    </ActionSection>
+
+        <template #footer>
+            <NFlex>
+                <NButton v-if="! twoFactorEnabled" type="primary" :loading="enabling" :disabled="enabling" @click="withPasswordConfirmation(enableTwoFactorAuthentication)">
+                    Включить
+                </NButton>
+
+                <template v-else>
+                    <NButton v-if="confirming" type="primary" :disabled="enabling" @click="withPasswordConfirmation(confirmTwoFactorAuthentication)">
+                        Подтвердить
+                    </NButton>
+
+                    <NButton v-if="recoveryCodes.length > 0 && ! confirming" @click="withPasswordConfirmation(regenerateRecoveryCodes)">
+                        Сгенерировать новые коды
+                    </NButton>
+
+                    <NButton v-if="recoveryCodes.length === 0 && ! confirming" @click="withPasswordConfirmation(showRecoveryCodes)">
+                        Показать коды восстановления
+                    </NButton>
+
+                    <NButton v-if="confirming" :disabled="disabling" @click="withPasswordConfirmation(disableTwoFactorAuthentication)">
+                        Отмена
+                    </NButton>
+
+                    <NButton v-if="! confirming" type="error" secondary :loading="disabling" :disabled="disabling" @click="withPasswordConfirmation(disableTwoFactorAuthentication)">
+                        Отключить
+                    </NButton>
+                </template>
+            </NFlex>
+        </template>
+    </NCard>
+
+    <EdsModal v-model:show="passwordModal" title="Подтверждение пароля" @after-leave="closePasswordModal">
+        <NText depth="3" class="text-sm mb-3" style="display: block">
+            Для безопасности подтвердите пароль, чтобы продолжить.
+        </NText>
+
+        <NInput
+            ref="passwordInputRef"
+            v-model:value="passwordForm.password"
+            type="password"
+            show-password-on="click"
+            placeholder="Пароль"
+            autocomplete="current-password"
+            @keyup.enter="confirmPassword"
+        />
+        <NText v-if="passwordForm.error" type="error" class="text-xs mt-1" style="display: block">
+            {{ passwordForm.error }}
+        </NText>
+
+        <NFlex justify="end" class="mt-4">
+            <NButton @click="closePasswordModal">
+                Отмена
+            </NButton>
+            <NButton type="primary" :loading="passwordForm.processing" :disabled="passwordForm.processing" @click="confirmPassword">
+                Подтвердить
+            </NButton>
+        </NFlex>
+    </EdsModal>
 </template>

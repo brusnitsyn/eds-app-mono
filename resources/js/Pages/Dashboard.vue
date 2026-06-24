@@ -1,22 +1,37 @@
 <script setup>
-import AppLayout from '@/Layouts/AppLayout.vue';
-import Welcome from '@/Components/Welcome.vue';
+import {ref} from "vue"
+import {useForm} from "@inertiajs/vue3"
+import AppLayout from "@/Layouts/AppLayout.vue"
+import DashboardPanel from "./Certificates/Partials/DashboardPanel.vue"
+import CertificateHeaderActions from "./Certificates/Partials/CertificateHeaderActions.vue"
+import CertificateOverlays from "./Certificates/Partials/CertificateOverlays.vue"
+
+defineProps({
+    certificates: Array,
+    staff: Array,
+    stats: Object,
+    dashboard: Object,
+})
+
+const overlays = ref(null)
+
+const revokeForm = useForm({})
+
+function revoke(cert) {
+    revokeForm.post(route("certificates.revoke", cert.id), {
+        onSuccess: () => window.$message?.success("Сертификат отозван"),
+    })
+}
 </script>
 
 <template>
-    <AppLayout title="Dashboard">
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Dashboard
-            </h2>
+    <AppLayout title="Дашборд" subtitle="Обзор состояния сертификатов организации">
+        <template #headerActions>
+            <CertificateHeaderActions @open-search="overlays.openSearch()" @open-wizard="overlays.openWizard()" />
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                    <Welcome />
-                </div>
-            </div>
-        </div>
+        <DashboardPanel :stats="stats" :dashboard="dashboard" @open-detail="overlays.openDetail($event)" />
     </AppLayout>
+
+    <CertificateOverlays ref="overlays" :certificates="certificates" :staff="staff" :revoking="revokeForm.processing" @revoke="revoke" />
 </template>

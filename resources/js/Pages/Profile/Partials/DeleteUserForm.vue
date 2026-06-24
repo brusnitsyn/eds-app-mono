@@ -1,15 +1,11 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionSection from '@/Components/ActionSection.vue';
-import DangerButton from '@/Components/DangerButton.vue';
-import DialogModal from '@/Components/DialogModal.vue';
-import InputError from '@/Components/InputError.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import { NAlert, NButton, NCard, NFlex, NInput, NText } from 'naive-ui';
+import EdsModal from '@/Components/Eds/EdsModal.vue';
 
 const confirmingUserDeletion = ref(false);
-const passwordInput = ref(null);
+const passwordInputRef = ref(null);
 
 const form = useForm({
     password: '',
@@ -18,85 +14,65 @@ const form = useForm({
 const confirmUserDeletion = () => {
     confirmingUserDeletion.value = true;
 
-    setTimeout(() => passwordInput.value.focus(), 250);
+    setTimeout(() => passwordInputRef.value?.focus(), 250);
 };
 
 const deleteUser = () => {
     form.delete(route('current-user.destroy'), {
         preserveScroll: true,
         onSuccess: () => closeModal(),
-        onError: () => passwordInput.value.focus(),
+        onError: () => passwordInputRef.value?.focus(),
         onFinish: () => form.reset(),
     });
 };
 
 const closeModal = () => {
     confirmingUserDeletion.value = false;
-
     form.reset();
 };
 </script>
 
 <template>
-    <ActionSection>
-        <template #title>
-            Delete Account
+    <NCard title="Удаление аккаунта">
+        <NAlert type="error" class="mb-4">
+            Это действие необратимо. После удаления учётной записи все связанные с ней данные и ресурсы будут удалены безвозвратно.
+        </NAlert>
+        <NText depth="3" class="text-sm" style="display: block">
+            Перед удалением учётной записи сохраните все данные, которые хотите оставить.
+        </NText>
+
+        <template #footer>
+            <NButton type="error" @click="confirmUserDeletion">
+                Удалить аккаунт
+            </NButton>
         </template>
+    </NCard>
 
-        <template #description>
-            Permanently delete your account.
-        </template>
+    <EdsModal v-model:show="confirmingUserDeletion" title="Удаление аккаунта" @after-leave="closeModal">
+        <NText depth="3" class="text-sm mb-3" style="display: block">
+            Вы уверены, что хотите удалить аккаунт? Все данные будут удалены безвозвратно. Введите пароль, чтобы подтвердить удаление.
+        </NText>
 
-        <template #content>
-            <div class="max-w-xl text-sm text-gray-600">
-                Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.
-            </div>
+        <NInput
+            ref="passwordInputRef"
+            v-model:value="form.password"
+            type="password"
+            show-password-on="click"
+            placeholder="Пароль"
+            autocomplete="current-password"
+            @keyup.enter="deleteUser"
+        />
+        <NText v-if="form.errors.password" type="error" class="text-xs mt-1" style="display: block">
+            {{ form.errors.password }}
+        </NText>
 
-            <div class="mt-5">
-                <DangerButton @click="confirmUserDeletion">
-                    Delete Account
-                </DangerButton>
-            </div>
-
-            <!-- Delete Account Confirmation Modal -->
-            <DialogModal :show="confirmingUserDeletion" @close="closeModal">
-                <template #title>
-                    Delete Account
-                </template>
-
-                <template #content>
-                    Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.
-
-                    <div class="mt-4">
-                        <TextInput
-                            ref="passwordInput"
-                            v-model="form.password"
-                            type="password"
-                            class="mt-1 block w-3/4"
-                            placeholder="Password"
-                            autocomplete="current-password"
-                            @keyup.enter="deleteUser"
-                        />
-
-                        <InputError :message="form.errors.password" class="mt-2" />
-                    </div>
-                </template>
-
-                <template #footer>
-                    <SecondaryButton @click="closeModal">
-                        Cancel
-                    </SecondaryButton>
-
-                    <DangerButton
-                        class="ms-3"
-                        :class="{ 'opacity-25': form.processing }"
-                        :disabled="form.processing"
-                        @click="deleteUser"
-                    >
-                        Delete Account
-                    </DangerButton>
-                </template>
-            </DialogModal>
-        </template>
-    </ActionSection>
+        <NFlex justify="end" class="mt-4">
+            <NButton @click="closeModal">
+                Отмена
+            </NButton>
+            <NButton type="error" :loading="form.processing" :disabled="form.processing" @click="deleteUser">
+                Удалить аккаунт
+            </NButton>
+        </NFlex>
+    </EdsModal>
 </template>

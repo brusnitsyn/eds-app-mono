@@ -1,15 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
-import FormSection from '@/Components/FormSection.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import { NButton, NCard, NFlex, NForm, NFormItem, NInput, NText } from 'naive-ui';
 
-const passwordInput = ref(null);
-const currentPasswordInput = ref(null);
+const passwordInputRef = ref(null);
+const currentPasswordInputRef = ref(null);
 
 const form = useForm({
     current_password: '',
@@ -21,16 +16,19 @@ const updatePassword = () => {
     form.put(route('user-password.update'), {
         errorBag: 'updatePassword',
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => {
+            form.reset();
+            window.$message?.success('Пароль обновлён');
+        },
         onError: () => {
             if (form.errors.password) {
                 form.reset('password', 'password_confirmation');
-                passwordInput.value.focus();
+                passwordInputRef.value?.focus();
             }
 
             if (form.errors.current_password) {
                 form.reset('current_password');
-                currentPasswordInput.value.focus();
+                currentPasswordInputRef.value?.focus();
             }
         },
     });
@@ -38,63 +36,51 @@ const updatePassword = () => {
 </script>
 
 <template>
-    <FormSection @submitted="updatePassword">
-        <template #title>
-            Update Password
+    <NCard title="Пароль">
+        <NText depth="3" class="text-sm mb-4" style="display: block">
+            Используйте длинный, случайный пароль, чтобы обеспечить безопасность вашей учётной записи.
+        </NText>
+
+        <NForm label-placement="top" :model="form" class="max-w-sm" @submit.prevent="updatePassword">
+            <NFlex vertical :size="0">
+                <NFormItem label="Текущий пароль" :feedback="form.errors.current_password" :validation-status="form.errors.current_password ? 'error' : undefined">
+                    <NInput
+                        ref="currentPasswordInputRef"
+                        v-model:value="form.current_password"
+                        type="password"
+                        show-password-on="click"
+                        autocomplete="current-password"
+                    />
+                </NFormItem>
+
+                <NFormItem label="Новый пароль" :feedback="form.errors.password" :validation-status="form.errors.password ? 'error' : undefined">
+                    <NInput
+                        ref="passwordInputRef"
+                        v-model:value="form.password"
+                        type="password"
+                        show-password-on="click"
+                        autocomplete="new-password"
+                    />
+                </NFormItem>
+
+                <NFormItem label="Подтверждение пароля" :feedback="form.errors.password_confirmation" :validation-status="form.errors.password_confirmation ? 'error' : undefined">
+                    <NInput
+                        v-model:value="form.password_confirmation"
+                        type="password"
+                        show-password-on="click"
+                        autocomplete="new-password"
+                        @keyup.enter="updatePassword"
+                    />
+                </NFormItem>
+            </NFlex>
+        </NForm>
+
+        <template #footer>
+            <NFlex justify="end">
+                <NButton type="primary" attr-type="submit" :loading="form.processing" :disabled="form.processing" @click="updatePassword">
+                    Сохранить
+                </NButton>
+            </NFlex>
         </template>
-
-        <template #description>
-            Ensure your account is using a long, random password to stay secure.
-        </template>
-
-        <template #form>
-            <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="current_password" value="Current Password" />
-                <TextInput
-                    id="current_password"
-                    ref="currentPasswordInput"
-                    v-model="form.current_password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    autocomplete="current-password"
-                />
-                <InputError :message="form.errors.current_password" class="mt-2" />
-            </div>
-
-            <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="password" value="New Password" />
-                <TextInput
-                    id="password"
-                    ref="passwordInput"
-                    v-model="form.password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    autocomplete="new-password"
-                />
-                <InputError :message="form.errors.password" class="mt-2" />
-            </div>
-
-            <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="password_confirmation" value="Confirm Password" />
-                <TextInput
-                    id="password_confirmation"
-                    v-model="form.password_confirmation"
-                    type="password"
-                    class="mt-1 block w-full"
-                    autocomplete="new-password"
-                />
-                <InputError :message="form.errors.password_confirmation" class="mt-2" />
-            </div>
-        </template>
-
-        <template #actions>
-            <ActionMessage :on="form.recentlySuccessful" class="me-3">
-                Saved.
-            </ActionMessage>
-
-            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                Save
-            </PrimaryButton>
-        </template>
-    </FormSection>
+    </NCard>
 </template>

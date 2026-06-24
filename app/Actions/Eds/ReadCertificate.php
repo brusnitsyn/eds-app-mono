@@ -30,6 +30,10 @@ class ReadCertificate
                     broadcast(new CertificateProcessingEvent('processed', 'warning', "Обработка пакетов: {$batch->processedJobs()} из {$batch->totalJobs}"));
                 })
                 ->finally(function (Batch $batch) {
+                    if ($batch->hasFailures()) {
+                        broadcast(new CertificateProcessingEvent('failed', 'error', "Обработка пакетов завершена с ошибками"));
+                        return;
+                    }
                     broadcast(new CertificateProcessingEvent('success', 'success', "Обработка пакетов завершена"));
                 });
 
@@ -64,6 +68,10 @@ class ReadCertificate
                     broadcast(new CertificateProcessingEvent('processed', 'warning', "Обработка пакетов: {$batch->processedJobs()} из {$batch->totalJobs}"));
                 })
                 ->finally(function (Batch $batch) {
+                    if ($batch->hasFailures()) {
+                        broadcast(new CertificateProcessingEvent('failed', 'error', "Обработка пакетов завершена с ошибками"));
+                        return;
+                    }
                     broadcast(new CertificateProcessingEvent('success', 'success', "Обработка пакетов завершена"));
                 });
 

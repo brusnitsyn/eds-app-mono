@@ -13,17 +13,28 @@ Route::middleware([
 ])->group(function () {
 
     Route::get('/', function () {
-        return Inertia::render('Index', [
-            'canLogin' => Route::has('login'),
-            'canRegister' => Route::has('register'),
-            'staffCount' => \App\Models\Staff::count()
-        ]);
+        return redirect(route('dashboard'));
     });
 
     Route::resource('staff', \App\Http\Controllers\StaffController::class);
     Route::get('/reports/export', [\App\Http\Controllers\ReportController::class, 'reportExcel'])->name('staff.export');
     Route::get('/certification/download/{staff_ids}', [\App\Http\Controllers\StaffController::class, 'downloadCertificates'])->name('certification.download');
     Route::post('/certification/install', [\App\Http\Controllers\StaffController::class, 'installCertificates'])->name('certification.install');
+
+    Route::get('/dashboard', [\App\Http\Controllers\CertificateController::class, 'dashboard'])->name('dashboard');
+    Route::get('/journal', [\App\Http\Controllers\CertificateController::class, 'journal'])->name('journal');
+    Route::get('/staff', [\App\Http\Controllers\CertificateController::class, 'staff'])->name('staff');
+    Route::get('/settings', [\App\Http\Controllers\CertificateController::class, 'settings'])->name('settings');
+
+    Route::prefix('certificates')->name('certificates.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CertificateController::class, 'index'])->name('index');
+        Route::post('/settings/test-parser', [\App\Http\Controllers\CertificateController::class, 'testParser'])->name('settings.test-parser');
+        Route::post('/{certification}/revoke', [\App\Http\Controllers\CertificateController::class, 'revoke'])->name('revoke');
+
+        Route::post('/trusted-ca', [\App\Http\Controllers\TrustedCertificateAuthorityController::class, 'store'])->name('trusted-ca.store');
+        Route::delete('/trusted-ca/{trustedCertificateAuthority}', [\App\Http\Controllers\TrustedCertificateAuthorityController::class, 'destroy'])->name('trusted-ca.destroy');
+        Route::get('/trusted-ca/{trustedCertificateAuthority}/content', [\App\Http\Controllers\TrustedCertificateAuthorityController::class, 'content'])->name('trusted-ca.content');
+    });
 //    Route::resource('journal', \App\Http\Controllers\JournalController::class);
     Route::get('/journals', function () {
         return Inertia::render('Journals/Index');

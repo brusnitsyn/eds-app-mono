@@ -1,6 +1,7 @@
 {
-    "pages.staff": "Персонал",
-    "pages.journal": "Журнал",
+    "pages.staff": "Сотрудники",
+    "pages.dashboard": "Дашборд",
+    "pages.journal": "Журнал событий",
     "pages.journals": "Журналы",
     "pages.patient-falling": "Журнал регистрации падений пациентов и посетителей",
     "pages.user": "Учетная запись",
@@ -12,6 +13,8 @@
     "pages.mis.users": "Учетные записи",
     "pages.mis.users.show": "Просмотр учетной записи",
     "pages.mis.templates": "Шаблоны ролей",
+    "pages.certificates": "Сертификаты",
+    "pages.settings": "Настройки",
 
     "fallingPatient": {
         "id": "ИД",

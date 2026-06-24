@@ -46,7 +46,17 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
                 'query' => $request->query(),
             ],
-            'newspaper' => $text
+            'newspaper' => $text,
+            'certificateStats' => fn () => [
+                'total' => \App\Models\Certification::query()
+                    ->latestPerStaff()
+                    ->whereHas('staff')
+                    ->count(),
+            ],
+            'trustedCertificateAuthorities' => fn () => \App\Models\TrustedCertificateAuthority::query()
+                ->orderBy('type')
+                ->orderBy('name')
+                ->get(['id', 'name', 'type']),
         ];
     }
 }
