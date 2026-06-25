@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Eds\ReadCertificate;
+use App\Facades\MisDoctor;
 use App\Models\Certification;
 use App\Models\Division;
 use App\Models\Staff;
@@ -53,11 +54,11 @@ class CertificateController extends Controller
         ]);
     }
 
-    public function staff()
+    public function staff(Request $request)
     {
         return Inertia::render('Certificates/Staff', [
             ...$this->overlayData(),
-            'divisions' => Division::query()->orderBy('label')->get(['id', 'label']),
+            'directory' => $this->staffDirectory($request),
             'mis' => $this->misStats(),
         ]);
     }
@@ -229,6 +230,125 @@ class CertificateController extends Controller
                 ];
             })
             ->values();
+    }
+
+    /**
+     * Merges MIS doctors with locally-managed staff that have no MIS pairing
+     * into a single, server-paginated/searchable directory. MIS and local
+     * staff live in physically separate databases, so the merge happens here
+     * in PHP rather than via SQL — manual (unpaired) staff are listed first,
+     * MIS doctors fill the remainder of each page.
+     */
+    private function staffDirectory(Request $request): array
+    {
+        $searchValue = trim((string) $request->query('search_value', '')) ?: null;
+        $pageSize = max(1, (int) $request->query('page_size', 25));
+        $page = max(1, (int) $request->query('page', 1));
+
+        $divisions = Division::query()->get(['id', 'label'])->keyBy('id');
+
+        $manualQuery = Staff::query()->whereNull('mis_user_id');
+        if ($searchValue !== null) {
+            $manualQuery->where(function ($q) use ($searchValue) {
+                $q->where('full_name', 'like', "%{$searchValue}%")
+                    ->orWhere('snils', 'like', "%{$searchValue}%");
+            });
+        }
+
+        $manualStaff = (clone $manualQuery)->orderBy('full_name')
+            ->with(['certification' => fn ($q) => $q->latest('created_at')->limit(1)])
+            ->get();
+        $manualTotal = $manualStaff->count();
+
+        $misTotal = MisDoctor::countDoctors($searchValue);
+        $total = $manualTotal + $misTotal;
+
+        $offset = ($page - 1) * $pageSize;
+        $rows = collect();
+
+        if ($offset < $manualTotal) {
+            $rows = $rows->concat(
+                $manualStaff->slice($offset, $pageSize)->values()
+                    ->map(fn (Staff $staff) => $this->presentManualStaffRow($staff, $divisions))
+            );
+        }
+
+        $remaining = $pageSize - $rows->count();
+
+        if ($remaining > 0) {
+            $misOffset = max(0, $offset - $manualTotal);
+            $doctors = MisDoctor::getSlice($searchValue, $misOffset, $remaining);
+
+            $snilsList = $doctors->map(fn ($d) => $this->normalizeSnils($d['snils'] ?? null))->filter()->values();
+
+            $matchedStaff = Staff::query()
+                ->whereIn('snils', $snilsList)
+                ->with(['certification' => fn ($q) => $q->latest('created_at')->limit(1)])
+                ->get()
+                ->keyBy(fn (Staff $s) => $this->normalizeSnils($s->snils));
+
+            $rows = $rows->concat(
+                $doctors->map(fn ($doctor) => $this->presentMisDoctorRow($doctor, $matchedStaff, $divisions))
+            );
+        }
+
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $rows->values(),
+            $total,
+            $pageSize,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return $paginator->toArray();
+    }
+
+    private function presentManualStaffRow(Staff $staff, Collection $divisions): array
+    {
+        $certification = $staff->certification;
+
+        return [
+            'id' => "staff-{$staff->id}",
+            'staff_id' => $staff->id,
+            'mis_user_id' => null,
+            'fio' => $staff->full_name,
+            'position' => $staff->job_title,
+            'division_id' => $staff->division_id,
+            'division' => $divisions->get($staff->division_id)?->label,
+            'snils' => $staff->snils,
+            'cert_status' => $certification?->status(),
+            'has_certificate' => $certification !== null,
+            'source' => 'manual',
+        ];
+    }
+
+    private function presentMisDoctorRow(array $doctor, Collection $matchedStaff, Collection $divisions): array
+    {
+        $staff = $matchedStaff->get($this->normalizeSnils($doctor['snils'] ?? null));
+        $certification = $staff?->certification;
+
+        return [
+            'id' => "mis-{$doctor['id']}",
+            'staff_id' => $staff?->id,
+            'mis_user_id' => $doctor['id'],
+            'fio' => trim("{$doctor['last_name']} {$doctor['first_name']} {$doctor['middle_name']}"),
+            'position' => $doctor['prvd_name'] ?? null,
+            'division_id' => $staff?->division_id,
+            'division' => $staff ? $divisions->get($staff->division_id)?->label : null,
+            'snils' => $doctor['snils'] ?? null,
+            'cert_status' => $certification?->status(),
+            'has_certificate' => $certification !== null,
+            'source' => 'mis',
+        ];
+    }
+
+    private function normalizeSnils(?string $snils): ?string
+    {
+        if ($snils === null || $snils === '') {
+            return null;
+        }
+
+        return Str::of($snils)->replace(['-', ' '], '')->toString();
     }
 
     private function latestCertifications(): Collection

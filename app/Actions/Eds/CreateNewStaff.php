@@ -4,6 +4,7 @@ namespace App\Actions\Eds;
 
 use App\Models\Staff;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class CreateNewStaff
 {
@@ -38,7 +39,16 @@ class CreateNewStaff
         $staff = Staff::updateOrCreate(['inn' => $data['inn']], $data);
         if ($staff->certification()->exists()) $staff->certification->delete();
         $staff->certification()->create($certification);
-        $staff->searchable();
+
+        // Синхронизация поискового индекса (Typesense) — вспомогательная и не
+        // должна откатывать сохранение сотрудника/сертификата (этот вызов
+        // выполняется внутри DB::transaction в ProcessCertificateUpload), если
+        // Typesense временно недоступен.
+        try {
+            $staff->searchable();
+        } catch (\Throwable $e) {
+            Log::warning('CreateNewStaff: не удалось синхронизировать поисковый индекс — ' . $e->getMessage());
+        }
 
         return $staff;
     }

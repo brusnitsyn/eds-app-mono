@@ -69,6 +69,16 @@ class MisController extends Controller
 
     public function user(int $userId, Request $request)
     {
+        return Inertia::render('MIS/Users/Show', $this->buildUserDetail($userId));
+    }
+
+    public function userDetail(int $userId, Request $request)
+    {
+        return response()->json($this->buildUserDetail($userId));
+    }
+
+    private function buildUserDetail(int $userId): array
+    {
         $user = MisDoctor::getDoctorById($userId)->toOriginal();
         $xUser = MisXUser::getUserByDoctorId($userId);
         $prvds = MisDoctor::getPrvd($userId);
@@ -79,7 +89,7 @@ class MisController extends Controller
 
         $templates = MisRoleTemplate::with(['createUser'])->get();
 
-        return Inertia::render('MIS/Users/Show', [
+        return [
             'user' => $user,
             'x_user' => $xUser,
             'jobs' => $prvds,
@@ -93,7 +103,7 @@ class MisController extends Controller
             'roles' => $this->getRoles(),
             'user_roles' => empty($xUser) ? [] : $this->getRolesByUserId($xUser->UserID),
             'role_templates' => $templates
-        ]);
+        ];
     }
 
     /**
@@ -224,37 +234,20 @@ class MisController extends Controller
 
         $post = MisDoctor::createPrvd($data);
 
-        return redirect(route('mis.user', ['userId' => $userId]));
+        return back();
     }
 
     public function updateUser(int $userId, Request $request)
     {
-//        $data = $request->validate([
-//            'PCOD' => ['required', 'string'],
-//            'OT_V' => ['required', 'string'],
-//            'IM_V' => ['required', 'string'],
-//            'FAM_V' => ['required', 'string'],
-//            'DR' => ['required', 'string'],
-//            'SS' => ['required', 'string'],
-//            'isDoctor' => ['required', 'boolean'],
-//            'inTime' => ['required', 'boolean'],
-//            'isSpecial' => ['required', 'boolean'],
-//            'isDismissal' => ['required', 'boolean'],
-//            'rf_LPUID' => ['required', 'numeric'],
-//            'rf_PRVSID' => ['required', 'numeric'],
-//            'rf_DepartmentID' => ['required', 'numeric'],
-//            'rf_PRVDID' => ['required', 'numeric'],
-//        ]);
-//        $data['DR'] = Carbon::parse($data['DR'])->toDateTimeLocalString();
-        $data = DoctorData::from($request->all());
-        dd($data->toArray());
+        $data = DoctorData::from($request->all())
+            ->except('id', 'start_at', 'end_at', 'prvs_code', 'prvs_name', 'lpu_name', 'department_name', 'prvd_name', 'has_password_change');
 
-        $hasUpdated = DB::connection('mis')
+        DB::connection('mis')
             ->table('hlt_LPUDoctor')
             ->where('LPUDoctorID', '=', $userId)
-            ->update($data);
+            ->update($data->toArray());
 
-        return redirect(route('mis.user', ['userId' => $userId]));
+        return back();
     }
 
     public function updateOrCreateAccess(int $doctorId, Request $request)
@@ -299,7 +292,7 @@ class MisController extends Controller
                 'GeneralPassword' => $data['GeneralPassword'],
             ]);
 
-        return redirect(route('mis.user', ['userId' => $doctorId]));
+        return back();
     }
 
     public function updatePost(int $doctorId, Request $request)
@@ -311,7 +304,7 @@ class MisController extends Controller
             ->where('DocPRVDID', '=', $data->id)
             ->update($data->except('id', 'guid')->toArray());
 
-        return redirect(route('mis.user', ['userId' => $doctorId]));
+        return back();
     }
 
     public function updateRoles(int $userId, Request $request)
@@ -352,6 +345,8 @@ class MisController extends Controller
         $hasInsert = DB::connection('mis')
             ->table('x_UserRole')
             ->insert($addRoles);
+
+        return back();
     }
 
     public function changePassword(int $userId, Request $request)
@@ -403,6 +398,8 @@ class MisController extends Controller
                     ]);
             }
         }
+
+        return back();
     }
 
     public function roles()

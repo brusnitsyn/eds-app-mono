@@ -16,6 +16,13 @@ const themeOverrides = {
     Menu: {
         itemHeight: '36px',
     },
+    Modal: {
+        peers: {
+            Dialog: { borderRadius: '8px' },
+            Card: { borderRadius: '8px' },
+        },
+    },
+    Dialog: { borderRadius: '8px' },
 }
 </script>
 

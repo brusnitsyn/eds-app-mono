@@ -29,11 +29,46 @@ class ProcessCertificateUpload implements ShouldQueue
      */
     public $tries = 1;
 
+    /**
+     * Явный лимит вместо дефолтного воркер-таймаута (60с у queue:listen без
+     * --timeout) — проверка CRL ходит в сеть за пределами этого процесса
+     * (см. Python certificate_parser.py), и на медленном/недоступном УЦ может
+     * не успеть за минуту даже с локальными таймаутами внутри парсера.
+     */
+    public $timeout = 90;
+
     protected $extractedCertificatePath;
 
-    public function __construct($extractedCertificatePath)
+    /**
+     * Этап, который транслировался последним — нужен только для failed(),
+     * чтобы корректно подписать событие при сбое, не дошедшем до fail().
+     */
+    protected string $currentStage = 'container';
+
+    /**
+     * true, если для текущего этапа уже отправлено failed-событие через fail()
+     * или явный broadcastStage(..., 'failed', ...). Не даёт failed() продублировать
+     * то же самое событие.
+     */
+    protected bool $failureAlreadyBroadcast = false;
+
+    /**
+     * Идентификатор сертификата внутри пакета загрузки — отличает события
+     * этого job'а от событий других сертификатов того же батча на фронте
+     * (см. ReadCertificate, который генерирует его при сборке job'ов).
+     */
+    public $packageId;
+
+    /**
+     * Человекочитаемая подпись сертификата для отображения в списке пакета.
+     */
+    public $packageLabel;
+
+    public function __construct($extractedCertificatePath, $packageId = null, $packageLabel = null)
     {
         $this->extractedCertificatePath = $extractedCertificatePath;
+        $this->packageId = $packageId;
+        $this->packageLabel = $packageLabel;
     }
 
     public function handle(PythonCertificateParserService $pythonCertificateParser): void
@@ -81,7 +116,15 @@ class ProcessCertificateUpload implements ShouldQueue
 
         $this->broadcastStage('done', 'success', 'Целостность контейнера подтверждена', 'container');
 
-        // ---- Этап 2: цепочка доверия ----
+        // ---- Этап 2: срок действия сертификата ----
+        $this->broadcastStage('running', 'info', 'Проверка срока действия сертификата…', 'expiry');
+        $expiry = $this->checkExpiry($parsedCert['validFrom_time_t'] ?? null, $parsedCert['validTo_time_t'] ?? null);
+        $this->broadcastStage($expiry['status'], $expiry['type'], $expiry['message'], 'expiry');
+        if ($expiry['status'] === 'failed') {
+            throw new \RuntimeException($expiry['message']);
+        }
+
+        // ---- Этап 3: цепочка доверия ----
         $this->broadcastStage('running', 'info', 'Проверка цепочки доверия…', 'chain');
         $chain = $this->checkTrustChain($parsedCert['issuer']['CN'] ?? null);
         $this->broadcastStage($chain['status'], $chain['type'], $chain['message'], 'chain');
@@ -89,7 +132,7 @@ class ProcessCertificateUpload implements ShouldQueue
             throw new \RuntimeException($chain['message']);
         }
 
-        // ---- Этап 3: проверка по списку отзыва (CRL) ----
+        // ---- Этап 4: проверка по списку отзыва (CRL) ----
         $this->broadcastStage('running', 'info', 'Проверка по списку отзыва (CRL)…', 'crl');
         $crl = $this->describeRevocation($pythonParsedCert['revocation'] ?? null);
         $this->broadcastStage($crl['status'], $crl['type'], $crl['message'], 'crl');
@@ -144,7 +187,12 @@ class ProcessCertificateUpload implements ShouldQueue
 
     private function broadcastStage(string $status, string $type, string $message, string $stage, array $data = []): void
     {
-        broadcast(new CertificateProcessingEvent($status, $type, $message, $stage, $data));
+        $this->currentStage = $stage;
+        if ($status === 'failed') {
+            $this->failureAlreadyBroadcast = true;
+        }
+
+        broadcast(new CertificateProcessingEvent($status, $type, $message, $stage, $data, $this->packageId, $this->packageLabel));
     }
 
     /**
@@ -158,6 +206,66 @@ class ProcessCertificateUpload implements ShouldQueue
         $this->broadcastStage('failed', 'error', $message, $stage);
 
         throw new \RuntimeException($message);
+    }
+
+    /**
+     * Laravel вызывает этот метод при ЛЮБОМ окончательном провале job'а — в том
+     * числе минуя fail(): таймаут воркера (MaxAttemptsExceededException при
+     * $tries = 1 после убийства зависшего процесса), нехватка памяти, обрыв
+     * соединения с БД и т.п. Без этого хука карточка пакета на фронте навсегда
+     * остаётся в статусе "running" последнего этапа, потому что failed-событие
+     * для неё так и не приходит.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        if ($this->failureAlreadyBroadcast) {
+            return;
+        }
+
+        Log::error('ProcessCertificateUpload: незапланированный сбой — ' . $exception->getMessage());
+        $this->broadcastStage('failed', 'error', 'Непредвиденная ошибка при обработке сертификата: ' . $exception->getMessage(), $this->currentStage);
+    }
+
+    /**
+     * Проверяет срок действия сертификата (notBefore/notAfter) относительно
+     * текущего момента. В отличие от отзыва по CRL, это локальная и всегда
+     * доступная проверка — просроченный сертификат блокируется независимо
+     * от того, что говорит CRL (запись об отзыве могла быть уже удалена из
+     * CRL удостоверяющим центром именно потому, что срок действия истёк).
+     */
+    private function checkExpiry(?int $validFromTimestamp, ?int $validToTimestamp): array
+    {
+        if ($validFromTimestamp === null || $validToTimestamp === null) {
+            return [
+                'status' => 'failed',
+                'type' => 'error',
+                'message' => 'Не удалось определить срок действия сертификата',
+            ];
+        }
+
+        $now = Carbon::now();
+
+        if ($now->getTimestamp() > $validToTimestamp) {
+            return [
+                'status' => 'failed',
+                'type' => 'error',
+                'message' => 'Сертификат просрочен: срок действия закончился ' . Carbon::createFromTimestamp($validToTimestamp)->format('d.m.Y'),
+            ];
+        }
+
+        if ($now->getTimestamp() < $validFromTimestamp) {
+            return [
+                'status' => 'failed',
+                'type' => 'error',
+                'message' => 'Срок действия сертификата ещё не начался: действует с ' . Carbon::createFromTimestamp($validFromTimestamp)->format('d.m.Y'),
+            ];
+        }
+
+        return [
+            'status' => 'done',
+            'type' => 'success',
+            'message' => 'Сертификат действителен по сроку (до ' . Carbon::createFromTimestamp($validToTimestamp)->format('d.m.Y') . ')',
+        ];
     }
 
     /**

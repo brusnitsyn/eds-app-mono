@@ -70,6 +70,7 @@ Route::middleware([
             Route::post('/', [\App\Http\Controllers\MisController::class, 'createUser'])->name('mis.users.create');
             Route::prefix('{userId}')->group(function () {
                 Route::get('/', [\App\Http\Controllers\MisController::class, 'user'])->name('mis.user');
+                Route::get('/detail', [\App\Http\Controllers\MisController::class, 'userDetail'])->name('mis.users.user.detail');
                 Route::post('/post', [\App\Http\Controllers\MisController::class, 'createPost'])->name('mis.users.post.create');
                 Route::put('/update', [\App\Http\Controllers\MisController::class, 'updateUser'])->name('mis.users.user.update');
                 Route::put('/update-access', [\App\Http\Controllers\MisController::class, 'updateOrCreateAccess'])->name('mis.users.user.access.update');

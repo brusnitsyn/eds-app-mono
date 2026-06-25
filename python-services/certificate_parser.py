@@ -11,11 +11,16 @@ Usage:
     python certificate_parser.py --input-file cert.pem
 """
 
+from __future__ import annotations
+
 import argparse
 import base64
 import os
 import re
+import signal
+import sys
 import urllib.request
+from urllib.parse import urlparse
 from datetime import datetime
 from typing import Dict, Any, Optional
 import OpenSSL.crypto
@@ -144,15 +149,26 @@ class CertificateParser:
         # Serial number as uppercase hex string with preserved leading zero bytes.
         info['serial_number'] = self._get_serial_number_hex()
         
-        # Signature algorithm
-        info['signature_algorithm'] = self.cert.get_signature_algorithm().decode('utf-8')
-        
-        # Public key information
-        pub_key = self.cert.get_pubkey()
-        info['public_key'] = {
-            'type': pub_key.type(),
-            'bits': pub_key.bits(),
-        }
+        # Signature algorithm — GOST OIDs have no human-readable name registered
+        # in stock OpenSSL, but get_signature_algorithm() itself doesn't raise for them.
+        try:
+            info['signature_algorithm'] = self.cert.get_signature_algorithm().decode('utf-8')
+        except Exception as e:
+            print(f"Warning: Could not read signature algorithm: {e}", file=sys.stderr)
+            info['signature_algorithm'] = None
+
+        # Public key information. Not used downstream — degrade gracefully
+        # instead of aborting the whole parse, since stock OpenSSL/pyOpenSSL
+        # can't build an EVP_PKEY for GOST R 34.10-2012 keys without a GOST engine.
+        try:
+            pub_key = self.cert.get_pubkey()
+            info['public_key'] = {
+                'type': pub_key.type(),
+                'bits': pub_key.bits(),
+            }
+        except Exception as e:
+            print(f"Warning: Could not read public key (likely GOST): {e}", file=sys.stderr)
+            info['public_key'] = None
         
         # Certificate version
         info['version'] = self.cert.get_version()
@@ -167,7 +183,7 @@ class CertificateParser:
         return info
 
     def _get_crl_urls(self) -> list:
-        """Extract CRL distribution point URLs from the certificate, if any."""
+        """Extract raw CRL distribution point URLs from the certificate, if any."""
         urls = []
         try:
             for i in range(self.cert.get_extension_count()):
@@ -178,6 +194,19 @@ class CertificateParser:
             print(f"Warning: Could not extract CRL distribution points: {e}")
         return urls
 
+    @staticmethod
+    def _is_local_only_host(url: str) -> bool:
+        """
+        True for .local hosts (RFC 6762 mDNS / internal-only TLD). CAs often
+        list one such point alongside a public one for use inside their own
+        network — it never resolves from here, so it's not worth attempting.
+        """
+        try:
+            host = urlparse(url).hostname or ''
+        except ValueError:
+            return False
+        return host.lower().endswith('.local')
+
     def check_revocation(self) -> Dict[str, Any]:
         """
         Best-effort CRL revocation check.
@@ -187,13 +216,23 @@ class CertificateParser:
         reports checked=False with an explanation rather than pretending the
         certificate is valid or revoked.
         """
-        urls = self._get_crl_urls()
-        if not urls:
+        all_urls = self._get_crl_urls()
+        urls = [url for url in all_urls if not self._is_local_only_host(url)]
+
+        if not all_urls:
             return {
                 'checked': False,
                 'revoked': None,
                 'source': None,
                 'error': 'У сертификата не указана точка распространения CRL',
+            }
+
+        if not urls:
+            return {
+                'checked': False,
+                'revoked': None,
+                'source': all_urls[0],
+                'error': 'Точка распространения CRL указана только в локальной сети УЦ (.local) — недоступна отсюда',
             }
 
         try:
@@ -209,8 +248,7 @@ class CertificateParser:
         last_error = None
         for url in urls:
             try:
-                with urllib.request.urlopen(url, timeout=5) as response:
-                    crl_bytes = response.read()
+                crl_bytes = self._fetch_with_hard_timeout(url, timeout=5)
                 crl = load_der_x509_crl(crl_bytes)
                 revoked = crl.get_revoked_certificate_by_serial_number(serial_int) is not None
                 return {'checked': True, 'revoked': revoked, 'source': url, 'error': None}
@@ -224,6 +262,27 @@ class CertificateParser:
             'source': urls[0],
             'error': last_error or 'Сервис CRL недоступен',
         }
+
+    def _fetch_with_hard_timeout(self, url: str, timeout: int) -> bytes:
+        """
+        urlopen(timeout=...) only bounds the socket connect/read phase — DNS
+        resolution (getaddrinfo) for an unreachable or slow CA host is not
+        covered by it and can block far longer. That previously let a single
+        bad CRL distribution point stall the whole certificate job past the
+        queue worker's timeout. SIGALRM enforces a hard wall-clock deadline
+        covering the lookup too.
+        """
+        def _on_alarm(signum, frame):
+            raise TimeoutError(f"CRL fetch exceeded hard timeout of {timeout}s")
+
+        previous_handler = signal.signal(signal.SIGALRM, _on_alarm)
+        signal.alarm(timeout)
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as response:
+                return response.read()
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous_handler)
 
     def _get_serial_number_hex(self) -> str:
         """

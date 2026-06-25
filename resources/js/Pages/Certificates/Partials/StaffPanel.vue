@@ -1,22 +1,17 @@
 <script setup>
-import {NCard, NFlex, NIcon, NTag, NButton, NSelect, NDataTable, NText, NAvatar} from "naive-ui"
+import {NCard, NFlex, NIcon, NTag, NButton, NDataTable, NText, NAvatar, NSpace} from "naive-ui"
 import {computed, h, ref} from "vue"
+import {router, useForm} from "@inertiajs/vue3"
 import {IconDatabaseEdit, IconArrowRight} from "@tabler/icons-vue"
 import {staffInitials, avatarColor} from "@/Utils/certificateStatus.js"
+import EdsSearchInput from "@/Components/Eds/EdsSearchInput.vue"
 
 const props = defineProps({
-    staff: Array,
-    divisions: Array,
+    directory: Object,
     mis: Object,
 })
 
-const divisionFilter = ref(null)
-
-const divisionOptions = computed(() => props.divisions.map(d => ({label: d.label, value: d.id})))
-
-const filtered = computed(() => divisionFilter.value
-    ? props.staff.filter(p => p.division_id === divisionFilter.value)
-    : props.staff)
+const emit = defineEmits(["open-detail"])
 
 function certDef(row) {
     if (!row.has_certificate) return {label: "Нет УКЭП", type: "default"}
@@ -32,7 +27,7 @@ const columns = [
         width: 328,
         render(row) {
             return h(NFlex, {align: "center", size: 12, wrap: false}, () => [
-                h(NAvatar, {round: true, size: "small", color: avatarColor(row.id), style: "color:#fff;font-weight:600;flex:none"}, () => staffInitials(row.fio)),
+                h(NAvatar, {round: true, size: "small", color: avatarColor(row.mis_user_id ?? row.staff_id ?? 0), style: "color:#fff;font-weight:600;flex:none"}, () => staffInitials(row.fio)),
                 h("span", {class: "font-medium"}, row.fio),
             ])
         }
@@ -66,6 +61,60 @@ const columns = [
         }
     },
 ]
+
+const form = useForm({search_value: router.page.props.ziggy.query.search_value})
+
+const paginationReactive = ref({
+    page: props.directory.current_page,
+    pageSize: props.directory.per_page,
+    pageCount: props.directory.last_page,
+    showSizePicker: true,
+    pageSizes: [25, 50, 100],
+    onChange: (page) => {
+        fetchDirectory({...router.page.props.ziggy.query, page})
+    },
+    onUpdatePageSize: (pageSize) => {
+        fetchDirectory({...router.page.props.ziggy.query, page: 1, page_size: pageSize})
+    }
+})
+
+function fetchDirectory(query) {
+    router.get(route('staff'), {...query}, {
+        preserveState: true,
+        onSuccess: () => {
+            paginationReactive.value = {
+                ...paginationReactive.value,
+                page: props.directory.current_page,
+                pageSize: props.directory.per_page,
+                pageCount: props.directory.last_page,
+            }
+        }
+    })
+}
+
+function searchDirectory() {
+    form.get(route('staff'), {
+        preserveState: true,
+        onSuccess: () => {
+            paginationReactive.value = {
+                ...paginationReactive.value,
+                page: props.directory.current_page,
+                pageSize: props.directory.per_page,
+                pageCount: props.directory.last_page,
+            }
+        }
+    })
+}
+
+const searchValue = computed({
+    get() {
+        return form.search_value
+    },
+    set(value) {
+        form.search_value = value
+        searchDirectory()
+    }
+})
 </script>
 
 <template>
@@ -86,9 +135,15 @@ const columns = [
             </NFlex>
         </NCard>
 
-        <NDataTable size="small" min-height="calc(100vh - 295px)" max-height="calc(100vh - 295px)" :columns="columns"
-                    :data="filtered" :row-key="row => row.id"
+        <NSpace vertical>
+            <EdsSearchInput v-model:search="searchValue" :debounce="500" @searched="searchDirectory" :loading="form.processing" size="medium" placeholder="ФИО или СНИЛС" />
+        </NSpace>
+
+        <NDataTable remote size="small" min-height="calc(100vh - 360px)" max-height="calc(100vh - 360px)" :columns="columns"
+                    :data="directory.data" :row-key="row => row.id"
+                    :loading="form.processing"
                     table-layout="fixed"
-                    :pagination="{pageSize: 15, showSizePicker: true, pageSizes: [15, 30, 60]}" />
+                    :row-props="row => ({style: 'cursor:pointer', onClick: () => emit('open-detail', row)})"
+                    :pagination="paginationReactive" />
     </NFlex>
 </template>

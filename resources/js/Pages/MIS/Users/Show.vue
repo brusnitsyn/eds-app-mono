@@ -56,7 +56,7 @@ const onShowCreatePostModal = () => {
 
 const changePassword = () => {
     router
-        .post(route('mis.users.password.change', { userId: props.user.LPUDoctorID }), {}, {
+        .post(route('mis.users.password.change', { userId: props.user.id }), {}, {
             onSuccess: () => {
                 window.$message.success('Пароль изменен')
             }

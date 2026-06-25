@@ -183,18 +183,8 @@ class MisDoctorService
         ];
 
         $builder = $this->getBaseBuilder($this->doctorTable, null, $selects, $wheres);
-
-        if (!empty($searchValue)) {
-            if (intval($searchValue) != 0) {
-                $builder->when($searchValue, function ($query) use ($searchValue) {
-                    $query->where("PCOD", 'like', "$searchValue%");
-                });
-            } else {
-                $builder->when($searchValue, function ($query) use ($searchValue) {
-                    $query->whereRaw("CONCAT(FAM_V, ' ', IM_V, ' ', OT_V) LIKE ?", ["$searchValue%"]);
-                });
-            }
-        }
+        $this->applySearch($builder, $searchValue);
+        $builder->orderBy('FAM_V')->orderBy('IM_V')->orderBy('OT_V');
 
         $paginated = $builder->paginate($pageSize)->through(function ($item) {
             return [
@@ -209,6 +199,79 @@ class MisDoctorService
         });
 
         return $paginated;
+    }
+
+    /**
+     * Количество врачей по тому же критерию поиска, что и getPaginate()/getSlice() —
+     * нужно отдельно, чтобы вычислить общий total при объединении с локальным Staff.
+     */
+    public function countDoctors(string|null $searchValue): int
+    {
+        $wheres = [
+            [
+                'column' => 'LPUDoctorID',
+                'operator' => '<>',
+                'value' => 0
+            ]
+        ];
+
+        $builder = $this->getBaseBuilder($this->doctorTable, null, null, $wheres);
+        $this->applySearch($builder, $searchValue);
+
+        return $builder->count();
+    }
+
+    /**
+     * Произвольный диапазон врачей (offset/limit, а не номер "страницы") — нужен
+     * для постраничного объединения МИС-врачей с локальными Staff-записями без
+     * привязки к МИС в разделе «Сотрудники». LEFT JOIN (а не getBaseBuilder()'s
+     * relations-механизм, который делает INNER JOIN) — иначе врач без проставленной
+     * должности/отделения в МИС молча выпадал бы из списка.
+     */
+    public function getSlice(string|null $searchValue, int $offset, int $limit): Collection
+    {
+        $builder = DB::connection('mis')->table('hlt_LPUDoctor')
+            ->leftJoin('oms_PRVD', 'hlt_LPUDoctor.rf_PRVDID', '=', 'oms_PRVD.PRVDID')
+            ->leftJoin('oms_Department', 'hlt_LPUDoctor.rf_DepartmentID', '=', 'oms_Department.DepartmentID')
+            ->select([
+                'hlt_LPUDoctor.LPUDoctorID', 'hlt_LPUDoctor.PCOD', 'hlt_LPUDoctor.OT_V', 'hlt_LPUDoctor.IM_V',
+                'hlt_LPUDoctor.FAM_V', 'hlt_LPUDoctor.DR', 'hlt_LPUDoctor.SS',
+                'oms_PRVD.NAME as prvd_name', 'oms_Department.DepartmentName as department_name',
+            ])
+            ->where('hlt_LPUDoctor.LPUDoctorID', '<>', 0);
+
+        $this->applySearch($builder, $searchValue, 'hlt_LPUDoctor.');
+
+        return $builder
+            ->orderBy('hlt_LPUDoctor.FAM_V')->orderBy('hlt_LPUDoctor.IM_V')->orderBy('hlt_LPUDoctor.OT_V')
+            ->offset($offset)->limit($limit)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->LPUDoctorID,
+                    'code' => $item->PCOD,
+                    'middle_name' => $item->OT_V,
+                    'first_name' => $item->IM_V,
+                    'last_name' => $item->FAM_V,
+                    'brith_at' => $item->DR,
+                    'snils' => $item->SS,
+                    'prvd_name' => $item->prvd_name,
+                    'department_name' => $item->department_name,
+                ];
+            });
+    }
+
+    private function applySearch(\Illuminate\Database\Query\Builder $builder, string|null $searchValue, string $columnPrefix = ''): void
+    {
+        if (empty($searchValue)) {
+            return;
+        }
+
+        if (intval($searchValue) != 0) {
+            $builder->where("{$columnPrefix}PCOD", 'like', "$searchValue%");
+        } else {
+            $builder->whereRaw("CONCAT({$columnPrefix}FAM_V, ' ', {$columnPrefix}IM_V, ' ', {$columnPrefix}OT_V) LIKE ?", ["$searchValue%"]);
+        }
     }
 
     /**

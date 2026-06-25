@@ -27,7 +27,7 @@ const onAfterEnter = () => {
 
 const submit = () => {
     form
-        .submit('put', route('mis.users.user.access.update', { userId: props.user.LPUDoctorID }), {
+        .submit('put', route('mis.users.user.access.update', { userId: props.user.id }), {
             onSuccess: () => {
                 show.value = false
             }

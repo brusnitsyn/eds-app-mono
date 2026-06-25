@@ -181,13 +181,11 @@ class StaffController extends Controller
     public function store(CreateStaffRequest $request)
     {
         $data = $request->validated();
-        $certificateReader = new ReadCertificate();
 
-        if ($data['is_package']) {
-            $certificateReader->readMany($data['certificate']);
-        } else {
-            $certificateReader->readSingle($data['certificate']);
-        }
+        (new ReadCertificate())->readUploadedFiles(
+            $data['files'],
+            $data['paths'] ?? []
+        );
 
         return back();
     }

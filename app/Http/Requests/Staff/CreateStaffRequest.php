@@ -22,8 +22,15 @@ class CreateStaffRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'certificate' => ['required', 'file'],
-            'is_package' => ['required', 'boolean'],
+            // Файлы папок сертификата (.cer + контейнер закрытого ключа КриптоПро),
+            // загружаемые как есть, без ручной упаковки в архив.
+            'files' => ['required', 'array', 'min:1'],
+            'files.*' => ['required', 'file'],
+            // Относительные пути каждого файла внутри выбранных папок —
+            // выровнены с `files` по индексу. Нужны для восстановления структуры
+            // и автоматического разбиения на пакеты по числу .cer.
+            'paths' => ['nullable', 'array'],
+            'paths.*' => ['nullable', 'string'],
         ];
     }
 }
