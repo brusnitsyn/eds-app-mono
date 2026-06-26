@@ -17,9 +17,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+            \App\Http\Middleware\ForceHttps::class,
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
-        //
+        $middleware->alias([
+            'mfa' => \App\Http\Middleware\EnsureTwoFactorIsEnabled::class,
+            'password.fresh' => \App\Http\Middleware\EnsurePasswordIsNotExpired::class,
+            'audit' => \App\Http\Middleware\AuditLog::class,
+            'ip.whitelist' => \App\Http\Middleware\IpWhitelist::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         Integration::handles($exceptions);

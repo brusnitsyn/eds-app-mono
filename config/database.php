@@ -31,6 +31,25 @@ return [
 
     'connections' => [
 
+        // Отдельное соединение для журнала аудита (РСБ.3, ЗСВ.3) — физически
+        // изолировано от основной БД, в проде права приложения ограничены
+        // INSERT/SELECT (см. database/sql/audit_grants.sql).
+        'audit' => [
+            'driver' => env('AUDIT_DB_CONNECTION_DRIVER', 'sqlite'),
+            'url' => env('AUDIT_DB_URL'),
+            'database' => env('AUDIT_DB_DATABASE', database_path('audit.sqlite')),
+            'host' => env('AUDIT_DB_HOST', '127.0.0.1'),
+            'port' => env('AUDIT_DB_PORT', '5432'),
+            'username' => env('AUDIT_DB_USERNAME'),
+            'password' => env('AUDIT_DB_PASSWORD'),
+            'charset' => env('AUDIT_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('AUDIT_DB_SSLMODE', 'prefer'),
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+        ],
+
         'mis' => [
             'driver' => 'sqlsrv',
             'host' => env('MIS_DB_HOST', 'localhost'),

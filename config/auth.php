@@ -61,7 +61,10 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            // login/email зашифрованы (HasPdnEncryption) — нужен провайдер,
+            // ищущий через блайнд-индекс (App\Auth\EncryptedEloquentUserProvider,
+            // регистрируется в App\Providers\SecurityServiceProvider::boot()).
+            'driver' => 'eloquent-encrypted',
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
 

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Eds;
 
+use App\Facades\Audit;
 use App\Models\Staff;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -36,9 +37,20 @@ class CreateNewStaff
 
         $data['gender'] = 'slava';
 
-        $staff = Staff::updateOrCreate(['inn' => $data['inn']], $data);
+        // inn зашифрован недетерминированным AES, поэтому updateOrCreate(['inn' => ...])
+        // не нашёл бы существующую запись — ищем по детерминированному блайнд-индексу.
+        $staff = Staff::findByInn($data['inn']) ?? new Staff();
+        $wasExisting = $staff->exists;
+        $staff->fill($data);
+        $staff->save();
         if ($staff->certification()->exists()) $staff->certification->delete();
         $staff->certification()->create($certification);
+
+        Audit::log(
+            eventType: $wasExisting ? 'staff.updated' : 'staff.created',
+            action: $wasExisting ? 'update' : 'create',
+            resource: 'Staff:'.$staff->id,
+        );
 
         // Синхронизация поискового индекса (Typesense) — вспомогательная и не
         // должна откатывать сохранение сотрудника/сертификата (этот вызов

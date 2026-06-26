@@ -10,6 +10,9 @@ Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
+    'password.fresh',
+    'mfa',
+    'audit',
 ])->group(function () {
 
     Route::get('/', function () {
@@ -42,7 +45,7 @@ Route::middleware([
     Route::get('/journals/patient-falling', [\App\Http\Controllers\JournalController::class, 'patientFalling'])->name('journals.patient-falling.index');
     Route::post('/journals/patient-falling', [\App\Http\Controllers\JournalEventPatientFallingController::class, 'store'])->name('journals.patient-falling.store');
 
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware('ip.whitelist')->group(function () {
         Route::get('/', function () {
             return Inertia::render('Admin/Index', [
                 'userCount' => \App\Models\User::count(),

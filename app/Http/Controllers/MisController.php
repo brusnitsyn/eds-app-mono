@@ -85,7 +85,7 @@ class MisController extends Controller
         $snils = Str::replace('-', '', $user['snils']);
         $snils = Str::replace(' ', '', $snils);
 
-        $staff = Staff::where('snils', '=', $snils)->first();
+        $staff = Staff::findBySnils($snils);
 
         $templates = MisRoleTemplate::with(['createUser'])->get();
 

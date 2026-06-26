@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Eds\ReadCertificate;
+use App\Facades\Audit;
 use App\Facades\Crypto;
 use App\Http\Requests\Staff\CreateStaffRequest;
 use App\Models\Certification;
@@ -21,6 +22,8 @@ class StaffController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Staff::class);
+
         // Получаем фильтры из запроса
         $filters = $request->input('filters', []);
         $searchValue = Str::lower((string) $request->query('search_value'));
@@ -61,7 +64,16 @@ class StaffController extends Controller
 
         // Применяем фильтр по должности
         if (isset($filters['job_title']) && is_array($filters['job_title'])) {
-            $query->whereIn('job_title', $filters['job_title']);
+            if ($isScoutSearch) {
+                // Typesense-индекс хранит job_title открытым текстом
+                // (см. Staff::toSearchableArray()) — фильтрация не меняется.
+                $query->whereIn('job_title', $filters['job_title']);
+            } else {
+                // job_title в БД зашифрован — точный фильтр через блайнд-индекс.
+                $query->whereIn('job_title_hash', collect($filters['job_title'])
+                    ->map(fn ($value) => Staff::pdnExactHash($value))
+                    ->values());
+            }
         }
 
         // Если это Scout-запрос, сначала получаем результаты, затем фильтруем и загружаем отношения
@@ -95,14 +107,21 @@ class StaffController extends Controller
                 $page
             );
         } else {
+            // full_name/job_title/snils зашифрованы (AES-256-GCM, недетерминированно) —
+            // ORDER BY по шифротексту не имеет смысла. Сортировка по ним в БД
+            // отключена, откатываемся на дефолтную сортировку по дате создания.
+            $dbSortKey = in_array($sortKey, ['full_name', 'job_title', 'snils'], true)
+                ? 'created_at'
+                : $sortKey;
+
             // Если это обычный Eloquent-запрос, используем with и whereHas
             $query->with(['certification' => function($query) {
                 $query->latest('created_at')->limit(1);
             }]);
 
-            if (str_contains($sortKey, '.')) {
+            if (str_contains($dbSortKey, '.')) {
                 // Сортировка по связанной таблице
-                $parts = explode('.', $sortKey);
+                $parts = explode('.', $dbSortKey);
                 $relation = $parts[0]; // например 'certification'
                 $field = $parts[1];    // например 'valid_to'
 
@@ -128,11 +147,11 @@ class StaffController extends Controller
                         }]);
                 } else {
                     // Отношение не найдено - сортируем по основному полю
-                    $query->orderBy($sortKey, $sortOrder);
+                    $query->orderBy($dbSortKey, $sortOrder);
                 }
             } else {
                 // Обычная сортировка по полю основной таблицы
-                $query->orderBy($sortKey, $sortOrder);
+                $query->orderBy($dbSortKey, $sortOrder);
             }
 
             if (isset($validType)) {
@@ -180,6 +199,8 @@ class StaffController extends Controller
 
     public function store(CreateStaffRequest $request)
     {
+        $this->authorize('create', Staff::class);
+
         $data = $request->validated();
 
         (new ReadCertificate())->readUploadedFiles(
@@ -192,6 +213,8 @@ class StaffController extends Controller
 
     public function show(Staff $staff)
     {
+        $this->authorize('view', $staff);
+
         $staff = $staff->load(['certification' => function($query) {
             $query->latest('created_at')->limit(1);
         }]);
@@ -203,15 +226,23 @@ class StaffController extends Controller
 
     public function destroy(Staff $staff)
     {
+        $this->authorize('delete', $staff);
+
         if (Storage::disk('certification')->exists($staff->certification->path_certification))
             Storage::disk('certification')->deleteDirectory($staff->certification->path_certification);
 
+        $staffId = $staff->id;
+
         $staff->certification()->delete();
         $staff->delete();
+
+        Audit::log(eventType: 'staff.deleted', action: 'delete', resource: 'Staff:'.$staffId);
     }
 
     public function downloadCertificates(Request $request, $staff_ids)
     {
+        $this->authorize('downloadCertificates', Staff::class);
+
         $staffIds = explode(',', $staff_ids);
         if (empty($staffIds)) {
             return;
@@ -264,6 +295,8 @@ class StaffController extends Controller
 
     public function installCertificates(Request $request)
     {
+        $this->authorize('installCertificates', Staff::class);
+
         $staffIds = $request->input('staff_ids');
 
         $staffs = Staff::with(['certification' => function($query) {

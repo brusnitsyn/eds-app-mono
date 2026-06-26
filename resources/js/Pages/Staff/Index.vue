@@ -97,8 +97,6 @@ const columns = [
         ellipsis: {
             tooltip: true
         },
-        sorter: true,
-        sortOrder: true,
         render(row) {
             return h(
                 NFlex,
@@ -138,8 +136,6 @@ const columns = [
         title: 'СНИЛС',
         key: 'snils',
         width: 120,
-        sorter: true,
-        sortOrder: false,
     },
     {
         title: 'Ключ до',
@@ -176,8 +172,6 @@ const columns = [
     {
         title: 'Должность',
         key: 'job_title',
-        sortOrder: false,
-        sorter: true,
         ellipsis: {
             tooltip: true
         },

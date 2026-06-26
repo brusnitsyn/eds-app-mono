@@ -9,6 +9,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import NaiveLayout from "@/Layouts/NaiveLayout.vue";
 import ApplicationLogo from "@/Components/ApplicationLogo.vue";
+import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 defineProps({
     canResetPassword: Boolean,
@@ -64,7 +65,7 @@ function submit(e) {
 <template>
     <Head title="Авторизация" />
 
-    <NaiveLayout message-placement="bottom">
+    <AuthLayout>
         <AuthenticationCard>
             <template #logo>
                 <NImage src="/assets/svg/logo.svg" width="82" height="82" preview-disabled />
@@ -81,5 +82,5 @@ function submit(e) {
                 </NButton>
             </NForm>
         </AuthenticationCard>
-    </NaiveLayout>
+    </AuthLayout>
 </template>

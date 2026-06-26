@@ -3,7 +3,10 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Concerns\HasPdnEncryption;
+use App\Support\PasswordPolicy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -17,6 +20,7 @@ class User extends Authenticatable
 
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory;
+    use HasPdnEncryption;
     use HasProfilePhoto;
     use HasTeams;
     use Notifiable;
@@ -35,6 +39,31 @@ class User extends Authenticatable
         'phone',
         'role_id'
     ];
+
+    /**
+     * Поля ПДн, шифруемые на уровне приложения (мера ЗНИ).
+     *
+     * @var array<int, string>
+     */
+    protected array $encrypted = ['login', 'email', 'name'];
+
+    /**
+     * Карта «зашифрованный атрибут → колонка детерминированного хеша».
+     *
+     * @var array<string, string>
+     */
+    protected array $pdnLookupColumns = [
+        'login' => 'login_hash',
+        'email' => 'email_hash',
+    ];
+
+    /**
+     * login/email значимы посимвольно (дефис/пробел не нормализуются) —
+     * строгий хеш во избежание ложных совпадений разных значений.
+     *
+     * @var array<int, string>
+     */
+    protected array $pdnExactLookupColumns = ['login', 'email'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -67,6 +96,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_changed_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'is_blocked' => 'boolean',
         ];
     }
 
@@ -82,5 +114,45 @@ class User extends Authenticatable
     public function role(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * @return HasMany<PasswordHistory, $this>
+     */
+    public function passwordHistories(): HasMany
+    {
+        return $this->hasMany(PasswordHistory::class);
+    }
+
+    /**
+     * Истёк ли срок действия текущего пароля (мера ИАФ.3).
+     */
+    public function passwordExpired(): bool
+    {
+        $maxAge = PasswordPolicy::maxAgeDays();
+
+        if ($maxAge <= 0) {
+            return false;
+        }
+
+        $changedAt = $this->password_changed_at ?? $this->created_at;
+
+        return $changedAt !== null && $changedAt->addDays($maxAge)->isPast();
+    }
+
+    /**
+     * Заблокирована ли учётная запись (мера УПД.1, УПД.6).
+     */
+    public function isBlocked(): bool
+    {
+        return (bool) $this->is_blocked;
+    }
+
+    /**
+     * Есть ли у роли пользователя указанный scope (мера УПД.2/УПД.5).
+     */
+    public function hasScope(string $scope): bool
+    {
+        return $this->role?->scopes->pluck('name')->contains($scope) ?? false;
     }
 }

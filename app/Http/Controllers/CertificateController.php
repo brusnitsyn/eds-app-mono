@@ -247,17 +247,27 @@ class CertificateController extends Controller
 
         $divisions = Division::query()->get(['id', 'label'])->keyBy('id');
 
-        $manualQuery = Staff::query()->whereNull('mis_user_id');
-        if ($searchValue !== null) {
-            $manualQuery->where(function ($q) use ($searchValue) {
-                $q->where('full_name', 'like', "%{$searchValue}%")
-                    ->orWhere('snils', 'like', "%{$searchValue}%");
-            });
-        }
-
-        $manualStaff = (clone $manualQuery)->orderBy('full_name')
+        // full_name зашифрован (AES-256-GCM, недетерминированно) — ни LIKE, ни
+        // ORDER BY по нему на уровне SQL невозможны. Этот метод и так не имеет
+        // настоящей DB-пагинации (собирает полную Collection, объединяет с MIS,
+        // вручную нарезает страницы ниже) — поиск/сортировка по ФИО переносятся
+        // на PHP-уровень без потери архитектурных свойств. snils — точное
+        // совпадение всё ещё проверяется через блайнд-индекс (snils_hash).
+        $manualStaff = Staff::query()->whereNull('mis_user_id')
             ->with(['certification' => fn ($q) => $q->latest('created_at')->limit(1)])
             ->get();
+
+        if ($searchValue !== null) {
+            $searchLower = mb_strtolower($searchValue);
+            $searchHash = Staff::pdnLookupHash($searchValue);
+
+            $manualStaff = $manualStaff->filter(
+                fn (Staff $staff) => str_contains(mb_strtolower($staff->full_name), $searchLower)
+                    || $staff->snils_hash === $searchHash
+            )->values();
+        }
+
+        $manualStaff = $manualStaff->sortBy(fn (Staff $staff) => mb_strtolower($staff->full_name))->values();
         $manualTotal = $manualStaff->count();
 
         $misTotal = MisDoctor::countDoctors($searchValue);
@@ -282,7 +292,7 @@ class CertificateController extends Controller
             $snilsList = $doctors->map(fn ($d) => $this->normalizeSnils($d['snils'] ?? null))->filter()->values();
 
             $matchedStaff = Staff::query()
-                ->whereIn('snils', $snilsList)
+                ->bySnilsIn($snilsList)
                 ->with(['certification' => fn ($q) => $q->latest('created_at')->limit(1)])
                 ->get()
                 ->keyBy(fn (Staff $s) => $this->normalizeSnils($s->snils));

@@ -212,8 +212,7 @@ const activeTitle = computed(() => {
 })
 
 const logout = () => {
-    router.post(route('logout'));
-    router.replace(route('login'))
+    router.post(route('logout'))
 }
 
 const processingCertification = ref({

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPdnEncryption;
 use App\Observers\CertificationObserver;
 use App\Traits\MisTrait;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -12,7 +13,15 @@ use Illuminate\Support\Carbon;
 #[ObservedBy(CertificationObserver::class)]
 class Certification extends Model
 {
-    use HasFactory, MisTrait;
+    use HasFactory, MisTrait, HasPdnEncryption;
+
+    /**
+     * Поля ПДн, шифруемые на уровне приложения (мера ЗНИ). Точный поиск и
+     * сортировка по ним не требуются — hash-колонки не нужны.
+     *
+     * @var array<int, string>
+     */
+    protected array $encrypted = ['serial_number', 'file_certification', 'mis_serial_number'];
 
     protected $fillable = [
         'serial_number',

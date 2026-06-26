@@ -23,7 +23,16 @@ class CreateNewUser implements CreatesNewUsers
     {
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'email' => [
+                'required', 'string', 'email', 'max:255',
+                // email зашифрован — обычный unique:users сравнивал бы открытый
+                // адрес с зашифрованной колонкой и никогда бы не находил совпадений.
+                function (string $attribute, mixed $value, callable $fail) {
+                    if (User::where('email_hash', User::pdnExactHash((string) $value))->exists()) {
+                        $fail('Адрес электронной почты уже используется.');
+                    }
+                },
+            ],
             'password' => $this->passwordRules(),
             'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature() ? ['accepted', 'required'] : '',
         ])->validate();
@@ -33,6 +42,7 @@ class CreateNewUser implements CreatesNewUsers
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'password' => Hash::make($input['password']),
+                'password_changed_at' => now(),
             ]), function (User $user) {
                 $this->createTeam($user);
             });

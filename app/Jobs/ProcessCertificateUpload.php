@@ -144,7 +144,7 @@ class ProcessCertificateUpload implements ShouldQueue
         $validToTimestamp = Carbon::parse($parsedCert['validTo_time_t'])->getTimestampMs();
         $snils = $parsedCert['subject']['SNILS'] ?? null;
 
-        $staff = Staff::whereSnils($snils)->first();
+        $staff = $snils !== null ? Staff::findBySnils($snils) : null;
         if ($staff && $staff->certification && $staff->certification->valid_to > $validToTimestamp) {
             Log::info('Сертификат устаревший, пропускаем пакет');
             $this->broadcastStage('done', 'success', 'В реестре уже есть более новый сертификат сотрудника', 'save', [
