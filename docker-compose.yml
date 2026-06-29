@@ -3,7 +3,7 @@ services:
   app:
     image: registry.brusoff.su/eds:2026.06-dev
     build: .
-    container_name: aokb_onboard_app
+    container_name: eds_app
     restart: unless-stopped
     ports:
       - "8090:80"
@@ -18,7 +18,12 @@ services:
       - ./.env:/var/www/html/.env
       - ./docker/php.ini:/usr/local/etc/php/conf.d/app.ini
       - ./docker/blocked_ips.map:/etc/nginx/blocked_ips.map
-      - ./storage/logs:/var/www/storage/logs
+      - ${SSL_CERTS_PATH:-./docker/ssl}:/etc/nginx/ssl:ro
+      - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/app:/var/www/html/storage/app
+      - ${CERTIFICATES_PATH:-./storage/app/certifications}:/var/www/html/storage/app/certifications
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - eds-network
 
@@ -26,10 +31,10 @@ services:
   queue:
     image: registry.brusoff.su/eds:2026.06-dev
     build: .
-    container_name: aokb_onboard_queue
+    container_name: eds_queue
     restart: unless-stopped
     working_dir: /var/www/html
-    command: php artisan queue:work redis --queue=default --sleep=3 --tries=3 --timeout=1800
+    command: php artisan queue:work redis --queue=default,notify --sleep=3 --tries=3 --timeout=1800
     environment:
       - REDIS_HOST=redis  # Явно указываем имя сервиса Redis
       - REDIS_PORT=6379
@@ -40,7 +45,11 @@ services:
     volumes:
       - ./.env:/var/www/html/.env
       - ./docker/php.ini:/usr/local/etc/php/conf.d/app.ini
-      - ./storage/logs:/var/www/storage/logs
+      - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/app:/var/www/html/storage/app
+      - ${CERTIFICATES_PATH:-./storage/app/certifications}:/var/www/html/storage/app/certifications
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - eds-network
 
@@ -48,7 +57,7 @@ services:
   scheduler:
     image: registry.brusoff.su/eds:2026.06-dev
     build: .
-    container_name: aokb_onboard_scheduler
+    container_name: eds_scheduler
     restart: unless-stopped
     working_dir: /var/www/html
     command: php artisan schedule:work
@@ -62,13 +71,40 @@ services:
     volumes:
       - ./.env:/var/www/html/.env
       - ./docker/php.ini:/usr/local/etc/php/conf.d/app.ini
-      - ./storage/logs:/var/www/storage/logs
+      - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/app:/var/www/html/storage/app
+      - ${CERTIFICATES_PATH:-./storage/app/certifications}:/var/www/html/storage/app/certifications
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - eds-network
+
+  #Reverb (WebSocket-сервер для broadcasting)
+  reverb:
+    image: registry.brusoff.su/eds:2026.06-dev
+    build: .
+    container_name: eds_reverb
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+    depends_on:
+      - redis
+      - app
+    volumes:
+      - ./.env:/var/www/html/.env
+      - ./docker/php.ini:/usr/local/etc/php/conf.d/app.ini
+      - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/app:/var/www/html/storage/app
     networks:
       - eds-network
 
   redis:
     image: redis:8-alpine
-    container_name: aokb_onboard_redis
+    container_name: eds_redis
     restart: unless-stopped
     volumes:
       - eds-redis:/data

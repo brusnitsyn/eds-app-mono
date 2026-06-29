@@ -79,7 +79,7 @@ class ProcessCertificateUpload implements ShouldQueue
         $this->broadcastStage('running', 'info', 'Проверка целостности контейнера…', 'container');
 
         $cerFile = collect($extractedFiles)->first(
-            fn ($file) => pathinfo($file, PATHINFO_EXTENSION) === 'cer'
+            fn ($file) => strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'cer'
         );
         if (!$cerFile) {
             $this->fail('container', 'В архиве не найден файл сертификата (.cer)');

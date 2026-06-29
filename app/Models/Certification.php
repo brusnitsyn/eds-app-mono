@@ -23,6 +23,16 @@ class Certification extends Model
      */
     protected array $encrypted = ['serial_number', 'file_certification', 'mis_serial_number'];
 
+    /**
+     * Точный поиск по зашифрованным полям этой модели не нужен (см. выше) —
+     * карта хеш-колонок пуста. Свойство нужно объявить явно: без него
+     * обращение к $this->pdnLookupColumns внутри трейта (через __get) Eloquent
+     * принимает за вызов несуществующего relation-метода с тем же именем.
+     *
+     * @var array<string, string>
+     */
+    protected array $pdnLookupColumns = [];
+
     protected $fillable = [
         'serial_number',
         'valid_from',

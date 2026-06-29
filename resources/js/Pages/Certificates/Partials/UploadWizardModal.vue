@@ -58,7 +58,7 @@ function packageErrorMessage(pkg) {
 }
 
 const allPackagesSettled = computed(() => packages.value.length > 0 && packages.value.every(packageSettled))
-const step2ShowFooter = computed(() => allPackagesSettled.value || !!batchFailureMessage.value)
+const step2ShowFooter = computed(() => allPackagesSettled.value || !!batchFailureMessage.value || watchdogTimedOut.value)
 // Идти дальше можно и если часть сертификатов пакета провалилась — на шаге 3
 // провалившиеся показаны отдельным списком с причиной, это не экран "только успех".
 const step2CanAdvance = computed(() => allPackagesSettled.value && !batchFailureMessage.value)
@@ -72,9 +72,33 @@ let channel = null
 let handler = null
 let didReload = false
 
+// Если после старта (или после последнего события) долго нет новых событий —
+// либо сервер недоступен, либо не доехала публикация в Reverb (см. инцидент
+// с hairpin NAT: job на бэке отрабатывает, а событие до фронта не доходит).
+// Сказать об этом через сам broadcasting нельзя — это и есть то, что сломано.
+const WATCHDOG_TIMEOUT_MS = 45000
+let watchdogTimer = null
+const watchdogTimedOut = ref(false)
+
+function resetWatchdog() {
+    clearTimeout(watchdogTimer)
+    watchdogTimer = setTimeout(() => {
+        watchdogTimedOut.value = true
+    }, WATCHDOG_TIMEOUT_MS)
+}
+
+function stopWatchdog() {
+    clearTimeout(watchdogTimer)
+    watchdogTimer = null
+}
+
 onMounted(() => {
     channel = window.Echo.channel("certificate.processing")
     handler = (data) => {
+        if (!allPackagesSettled.value && !batchFailureMessage.value) {
+            resetWatchdog()
+        }
+
         processing.value = data
 
         // Состав батча — приходит один раз, сразу после постановки в очередь,
@@ -124,16 +148,22 @@ onMounted(() => {
             didReload = true
             router.reload()
         }
+
+        if (allPackagesSettled.value || batchFailureMessage.value) {
+            stopWatchdog()
+        }
     }
     channel.listen("CertificateProcessingEvent", handler)
 })
 
 onUnmounted(() => {
+    stopWatchdog()
     channel?.stopListening("CertificateProcessingEvent", handler)
 })
 
 function onUploadSuccess() {
     step.value = 2
+    resetWatchdog()
 }
 
 function confirmData() {
@@ -202,6 +232,8 @@ function reset() {
     batchFailureMessage.value = null
     packages.value = []
     didReload = false
+    stopWatchdog()
+    watchdogTimedOut.value = false
 }
 
 function close() {
@@ -252,7 +284,13 @@ function goToList() {
             </div>
 
             <NFlex v-else-if="step === 2" vertical :size="16" class="py-2">
-                <div v-if="packages.length === 0" class="flex flex-col items-center gap-2 py-6 text-gray-400 dark:text-white/40 text-xs">
+                <NAlert v-if="watchdogTimedOut && !step2ShowFooter" type="error" :show-icon="false">
+                    Сервер не отвечает о статусе обработки дольше обычного — соединение с сервером прервалось,
+                    либо сам сервер сейчас недоступен. Сертификат может всё ещё обрабатываться: проверьте
+                    список сертификатов позже или попробуйте загрузить заново.
+                </NAlert>
+
+                <div v-if="packages.length === 0 && !watchdogTimedOut" class="flex flex-col items-center gap-2 py-6 text-gray-400 dark:text-white/40 text-xs">
                     <NSpin :size="20" />
                     Постановка в очередь…
                 </div>

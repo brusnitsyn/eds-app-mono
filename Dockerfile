@@ -78,7 +78,7 @@ RUN npm ci \
     --no-audit \
     --progress=false
 
-COPY vite.config.js ./
+COPY vite.config.js tailwind.config.js postcss.config.js ./
 COPY resources/ ./resources/
 
 RUN npm run build
@@ -112,6 +112,8 @@ RUN apk update && apk add --no-cache \
     g++ \
     curl \
     gnupg \
+    python3 \
+    py3-openssl \
     && case $(uname -m) in \
         x86_64) architecture="amd64" ;; \
         arm64) architecture="arm64" ;; \
@@ -141,7 +143,9 @@ COPY docker/openssl.cnf /etc/ssl/openssl.cnf
 
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/app.conf /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/conf.d/10-docker.conf
 COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+RUN mkdir -p /var/log/supervisor
 
 WORKDIR /var/www/html
 
@@ -154,8 +158,8 @@ RUN chown -R application:application /var/www/html && \
 RUN php artisan storage:link
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/up || exit 1
+    CMD curl -kf https://localhost/up || exit 1
 
 EXPOSE 80
 
-CMD ["supervisord", "-c", "/etc/supervisor.d/supervisord.conf"]
+CMD ["/bin/sh", "-c", "mkdir -p /var/log/supervisor /var/log/nginx && exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf"]

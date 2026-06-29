@@ -3,13 +3,15 @@
 --  Учётная запись приложения может ТОЛЬКО добавлять и читать записи журнала,
 --  но не изменять и не удалять их — это обеспечивает неизменяемость журнала.
 --
---  Применять в отдельной БД журнала (AUDIT_DB_DATABASE) под суперпользователем.
---  PostgreSQL. Имя таблицы соответствует config('audit.table') (по умолчанию
---  audit_log).
+--  Роль app_audit_owner, БД app_audit и роль app_audit_writer создаются
+--  заранее скриптом database/sql/audit_bootstrap.sql. Таблица audit_log
+--  создаётся миграцией (php artisan migrate --database=audit
+--  --path=database/migrations/audit) ПЕРЕД запуском этого файла.
+--
+--  Применять под ролью-владельцем (app_audit_owner), не суперпользователем
+--  кластера. PostgreSQL. Имя таблицы соответствует config('audit.table')
+--  (по умолчанию audit_log).
 -- ============================================================================
-
--- 1. Роль приложения для записи журнала (укажите пароль из секрет-хранилища).
---    CREATE ROLE app_audit_writer LOGIN PASSWORD '***';
 
 -- 2. Подключение и схема.
 GRANT CONNECT ON DATABASE app_audit TO app_audit_writer;

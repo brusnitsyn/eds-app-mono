@@ -6,6 +6,15 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
+        <script>
+            window.reverb = {
+                key: "{{ config('reverb.apps.apps.0.key') }}",
+                host: "{{ config('reverb.apps.apps.0.options.host') }}",
+                port: "{{ config('reverb.apps.apps.0.options.port') }}",
+                scheme: "{{ config('reverb.apps.apps.0.options.scheme') }}",
+            }
+        </script>
+
         <!-- Scripts -->
         @routes
         @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])

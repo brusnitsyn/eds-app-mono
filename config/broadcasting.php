@@ -35,11 +35,17 @@ return [
             'key' => env('REVERB_APP_KEY'),
             'secret' => env('REVERB_APP_SECRET'),
             'app_id' => env('REVERB_APP_ID'),
+            // Это адрес для СЕРВЕРНОЙ публикации событий (PHP -> Reverb REST API),
+            // не для браузера (тот берёт host/port/scheme из REVERB_HOST/PORT/SCHEME
+            // через config/reverb.php, см. window.reverb в app.blade.php). Если тут
+            // оставить публичный домен, PHP будет ходить сам в себя через внешний
+            // домен:порт — на части сетей/NAT это просто виснет по таймауту
+            // (hairpin NAT). Поэтому по умолчанию — прямой внутренний адрес Reverb.
             'options' => [
-                'host' => env('REVERB_HOST'),
-                'port' => env('REVERB_PORT', 443),
-                'scheme' => env('REVERB_SCHEME', 'https'),
-                'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+                'host' => env('REVERB_INTERNAL_HOST', '127.0.0.1'),
+                'port' => env('REVERB_INTERNAL_PORT', env('REVERB_SERVER_PORT', 8080)),
+                'scheme' => env('REVERB_INTERNAL_SCHEME', 'http'),
+                'useTLS' => env('REVERB_INTERNAL_SCHEME', 'http') === 'https',
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
