@@ -25,9 +25,9 @@ class SecurityHeaders
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
         $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin');
 
-        // CSP не выставляется в local: Vite dev-server грузит ассеты с другого
+        // CSP не выставляется в dev: Vite dev-server грузит ассеты с другого
         // origin и использует eval, дефолтный CSP сломал бы `npm run dev`.
-        if (! app()->environment('local')) {
+        if (! app()->environment('local', 'testing') && ! config('app.debug')) {
             $response->headers->set('Content-Security-Policy', (string) config('security.headers.csp'));
         }
 

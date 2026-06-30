@@ -15,7 +15,9 @@ class ForceHttps
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->isSecure() && ! app()->environment('local', 'testing')) {
+        $isDevMode = app()->environment('local', 'testing') || config('app.debug');
+
+        if (! $request->isSecure() && ! $isDevMode) {
             return redirect()->secure($request->getRequestUri(), 301);
         }
 
