@@ -8,8 +8,6 @@ import CertificateHeaderActions from "./Partials/CertificateHeaderActions.vue"
 import CertificateOverlays from "./Partials/CertificateOverlays.vue"
 
 defineProps({
-    certificates: Array,
-    staff: Array,
     directory: Object,
     mis: Object,
 })
@@ -41,7 +39,7 @@ function openDetail(row) {
 
         <StaffPanel :directory="directory" :mis="mis" @open-detail="openDetail" />
 
-        <CertificateOverlays ref="overlays" :certificates="certificates" :staff="staff" :revoking="revokeForm.processing" @revoke="revoke" />
+        <CertificateOverlays ref="overlays" :revoking="revokeForm.processing" @revoke="revoke" />
         <StaffDetailDrawer v-model:show="detailOpen" :row="selectedRow" />
     </AppLayout>
 </template>

@@ -52,14 +52,6 @@ const columns = [
             return h(NTag, {type: def.type, round: true, size: "small"}, () => def.label)
         }
     },
-    {
-        title: "Источник",
-        width: 120,
-        key: "source",
-        render(row) {
-            return h(NTag, {type: row.source === "mis" ? "info" : "default", size: "small"}, () => row.source === "mis" ? "МИС" : "Вручную")
-        }
-    },
 ]
 
 const form = useForm({search_value: router.page.props.ziggy.query.search_value})

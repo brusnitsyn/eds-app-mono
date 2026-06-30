@@ -23,33 +23,28 @@ class CertificateController extends Controller
         return $readCertificate->read($request->file('certificate'));
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $certifications = $this->latestCertifications();
-
         return Inertia::render('Certificates/Index', [
-            ...$this->overlayData($certifications),
-            'stats' => $this->buildStats($certifications),
+            'directory' => $this->certificatesDirectory($request),
+            'stats' => $this->buildStats(),
         ]);
     }
 
     public function dashboard()
     {
-        $certifications = $this->latestCertifications();
-        $stats = $this->buildStats($certifications);
+        $stats = $this->buildStats();
         $journalEvents = $this->journalEvents();
 
         return Inertia::render('Certificates/Dashboard', [
-            ...$this->overlayData($certifications),
             'stats' => $stats,
-            'dashboard' => $this->dashboardData($certifications, $journalEvents),
+            'dashboard' => $this->dashboardData($stats, $journalEvents),
         ]);
     }
 
     public function journal()
     {
         return Inertia::render('Certificates/Journal', [
-            ...$this->overlayData(),
             'journalEvents' => $this->journalEvents(),
         ]);
     }
@@ -57,7 +52,6 @@ class CertificateController extends Controller
     public function staff(Request $request)
     {
         return Inertia::render('Certificates/Staff', [
-            ...$this->overlayData(),
             'directory' => $this->staffDirectory($request),
             'mis' => $this->misStats(),
         ]);
@@ -66,7 +60,6 @@ class CertificateController extends Controller
     public function settings()
     {
         return Inertia::render('Certificates/Settings', [
-            ...$this->overlayData(),
             'parser' => $this->parserInfo(),
             'storage' => [
                 'disk_root' => Storage::disk('certification')->path(''),
@@ -77,6 +70,43 @@ class CertificateController extends Controller
                 ->orderBy('name')
                 ->get(),
         ]);
+    }
+
+    /**
+     * Lightweight JSON search for the global command palette (Cmd+K). Runs
+     * over the full in-memory collections (same constraint as
+     * staffDirectory(): full_name/serial_number are app-level encrypted, so
+     * neither LIKE nor an index can do this in SQL) but only ever returns a
+     * handful of rows to the client instead of shipping every record.
+     */
+    public function search(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        if ($q === '') {
+            return response()->json(['certificates' => [], 'staff' => []]);
+        }
+
+        $qLower = mb_strtolower($q);
+
+        $certificates = $this->latestCertifications()
+            ->filter(function (Certification $c) use ($qLower) {
+                $haystack = mb_strtolower("{$c->staff->full_name} {$c->staff->snils} {$c->serial_number}");
+                return str_contains($haystack, $qLower);
+            })
+            ->take(6)
+            ->map(fn (Certification $c) => $this->present($c))
+            ->values();
+
+        $staff = $this->staffData()
+            ->filter(function (array $s) use ($qLower) {
+                $haystack = mb_strtolower("{$s['fio']} {$s['snils']} {$s['position']}");
+                return str_contains($haystack, $qLower);
+            })
+            ->take(6)
+            ->values();
+
+        return response()->json(['certificates' => $certificates, 'staff' => $staff]);
     }
 
     public function testParser()
@@ -114,17 +144,84 @@ class CertificateController extends Controller
     }
 
     /**
-     * Certificates + staff list every Certificates page needs for the shared
-     * search palette, upload wizard and detail drawer overlays.
+     * Server-side paginated, status-filtered and sorted certificates list for
+     * the Certificates index table. Unlike Staff's full_name/serial_number,
+     * the columns status()/sorting depend on (valid_to, is_valid, revoked_at)
+     * are NOT app-level encrypted, so the whole thing — filter, sort, count,
+     * LIMIT/OFFSET — runs as one real SQL query. Nothing but the requested
+     * page is ever loaded into PHP.
      */
-    private function overlayData(?Collection $certifications = null): array
+    private function certificatesDirectory(Request $request): array
     {
-        $certifications ??= $this->latestCertifications();
+        $status = $request->query('status', 'all');
+        $sortKey = $request->query('sort_key');
+        $sortOrder = $request->query('sort_order', 'asc');
+        $pageSize = max(1, (int) $request->query('page_size', 12));
+        $page = max(1, (int) $request->query('page', 1));
 
-        return [
-            'certificates' => $certifications->map(fn (Certification $c) => $this->present($c))->values(),
-            'staff' => $this->staffData(),
-        ];
+        $query = $this->statusQuery($status);
+
+        if ($sortKey === 'valid_to' && $sortOrder !== 'default') {
+            $query->orderBy('valid_to', $sortOrder === 'desc' ? 'desc' : 'asc');
+        } else {
+            $query->orderBy('certifications.id');
+        }
+
+        $paginator = $query->with('staff')->paginate($pageSize, ['*'], 'page', $page);
+
+        return $paginator->through(fn (Certification $c) => $this->present($c))->toArray();
+    }
+
+    /**
+     * Base query for one status bucket ('all' included), reused by both
+     * certificatesDirectory() (listing) and buildStats()/dashboardData()
+     * (counts + "expiring soon") so the status semantics are defined once.
+     */
+    private function statusQuery(string $status): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = Certification::query()->latestPerStaff()->whereHas('staff');
+        $this->applyStatusFilter($query, $status);
+
+        return $query;
+    }
+
+    private function applyStatusFilter(\Illuminate\Database\Eloquent\Builder $query, string $status): void
+    {
+        if ($status === 'all') {
+            return;
+        }
+
+        $nowMs = Carbon::now()->getTimestampMs();
+        $soonMs = Carbon::now()->addDays(30)->getTimestampMs();
+
+        if ($status === 'expired') {
+            // "Истекли / отозваны" — matches Certification::status() returning
+            // either 'expired' or 'revoked'.
+            $query->where(function ($q) use ($nowMs) {
+                $q->whereNotNull('revoked_at')
+                    ->orWhere(function ($q2) use ($nowMs) {
+                        $q2->whereNull('revoked_at')
+                            ->where(function ($q3) use ($nowMs) {
+                                $q3->where('is_valid', false)->orWhere('valid_to', '<', $nowMs);
+                            });
+                    });
+            });
+            return;
+        }
+
+        if ($status === 'expiring') {
+            $query->whereNull('revoked_at')
+                ->where('is_valid', true)
+                ->where('valid_to', '>=', $nowMs)
+                ->where('valid_to', '<=', $soonMs);
+            return;
+        }
+
+        if ($status === 'valid') {
+            $query->whereNull('revoked_at')
+                ->where('is_valid', true)
+                ->where('valid_to', '>', $soonMs);
+        }
     }
 
     private function misStats(): array
@@ -135,35 +232,33 @@ class CertificateController extends Controller
         ];
     }
 
-    private function dashboardData(Collection $certifications, Collection $journalEvents): array
+    private function dashboardData(array $stats, Collection $journalEvents): array
     {
-        $statusCounts = $certifications->map(fn (Certification $c) => $c->status())->countBy();
-        $total = max($certifications->count(), 1);
+        $total = max($stats['total'], 1);
 
         $distSegments = collect([
             ['key' => 'valid', 'label' => 'Действительны', 'color' => '#18a058'],
             ['key' => 'expiring', 'label' => 'Истекают', 'color' => '#f0a020'],
             ['key' => 'expired', 'label' => 'Истекли / отозваны', 'color' => '#d03050'],
-        ])->map(function ($segment) use ($statusCounts, $total) {
-            $count = $segment['key'] === 'expired'
-                ? $statusCounts->get('expired', 0) + $statusCounts->get('revoked', 0)
-                : $statusCounts->get($segment['key'], 0);
-
-            return [...$segment, 'count' => $count, 'width' => round($count / $total * 100) . '%'];
-        })->values();
+        ])->map(fn ($segment) => [
+            ...$segment,
+            'count' => $stats[$segment['key']],
+            'width' => round($stats[$segment['key']] / $total * 100) . '%',
+        ])->values();
 
         $staffTotal = Staff::count();
 
-        $expiringSoon = $certifications
-            ->filter(fn (Certification $c) => $c->status() === 'expiring')
-            ->sortBy(fn (Certification $c) => $c->valid_to)
-            ->take(6)
+        $expiringSoon = $this->statusQuery('expiring')
+            ->with('staff')
+            ->orderBy('valid_to')
+            ->limit(6)
+            ->get()
             ->map(fn (Certification $c) => $this->present($c))
             ->values();
 
         return [
             'staffTotal' => $staffTotal,
-            'coverage' => $staffTotal > 0 ? (int) round($certifications->count() / $staffTotal * 100) : 0,
+            'coverage' => $staffTotal > 0 ? (int) round($stats['total'] / $staffTotal * 100) : 0,
             'distSegments' => $distSegments,
             'expiringSoon' => $expiringSoon,
             'recentEvents' => $journalEvents->take(6)->values(),
@@ -233,11 +328,18 @@ class CertificateController extends Controller
     }
 
     /**
-     * Merges MIS doctors with locally-managed staff that have no MIS pairing
-     * into a single, server-paginated/searchable directory. MIS and local
-     * staff live in physically separate databases, so the merge happens here
-     * in PHP rather than via SQL — manual (unpaired) staff are listed first,
-     * MIS doctors fill the remainder of each page.
+     * Server-paginated/searchable MIS doctor directory. MIS doctors live in a
+     * physically separate (legacy, unencrypted) database, so search/sort/
+     * pagination all run as real SQL there (MisDoctorService::countDoctors()/
+     * getSlice()) — nothing is loaded into PHP beyond the requested page.
+     *
+     * Locally-managed staff with no MIS pairing are deliberately NOT merged
+     * in here anymore: their full_name is app-level encrypted, which made
+     * search/sort impossible in SQL and forced loading the entire manual
+     * Staff table into memory on every request just to paginate it in PHP.
+     * Unpaired local staff still exist and still show up wherever they're
+     * looked up directly (e.g. by certificate), they just aren't listed on
+     * this directory page.
      */
     private function staffDirectory(Request $request): array
     {
@@ -247,60 +349,19 @@ class CertificateController extends Controller
 
         $divisions = Division::query()->get(['id', 'label'])->keyBy('id');
 
-        // full_name зашифрован (AES-256-GCM, недетерминированно) — ни LIKE, ни
-        // ORDER BY по нему на уровне SQL невозможны. Этот метод и так не имеет
-        // настоящей DB-пагинации (собирает полную Collection, объединяет с MIS,
-        // вручную нарезает страницы ниже) — поиск/сортировка по ФИО переносятся
-        // на PHP-уровень без потери архитектурных свойств. snils — точное
-        // совпадение всё ещё проверяется через блайнд-индекс (snils_hash).
-        $manualStaff = Staff::query()->whereNull('mis_user_id')
-            ->with(['certification' => fn ($q) => $q->latest('created_at')->limit(1)])
-            ->get();
-
-        if ($searchValue !== null) {
-            $searchLower = mb_strtolower($searchValue);
-            $searchHash = Staff::pdnLookupHash($searchValue);
-
-            $manualStaff = $manualStaff->filter(
-                fn (Staff $staff) => str_contains(mb_strtolower($staff->full_name), $searchLower)
-                    || $staff->snils_hash === $searchHash
-            )->values();
-        }
-
-        $manualStaff = $manualStaff->sortBy(fn (Staff $staff) => mb_strtolower($staff->full_name))->values();
-        $manualTotal = $manualStaff->count();
-
-        $misTotal = MisDoctor::countDoctors($searchValue);
-        $total = $manualTotal + $misTotal;
-
+        $total = MisDoctor::countDoctors($searchValue);
         $offset = ($page - 1) * $pageSize;
-        $rows = collect();
+        $doctors = MisDoctor::getSlice($searchValue, $offset, $pageSize);
 
-        if ($offset < $manualTotal) {
-            $rows = $rows->concat(
-                $manualStaff->slice($offset, $pageSize)->values()
-                    ->map(fn (Staff $staff) => $this->presentManualStaffRow($staff, $divisions))
-            );
-        }
+        $snilsList = $doctors->map(fn ($d) => $this->normalizeSnils($d['snils'] ?? null))->filter()->values();
 
-        $remaining = $pageSize - $rows->count();
+        $matchedStaff = Staff::query()
+            ->bySnilsIn($snilsList)
+            ->with(['certification' => fn ($q) => $q->latest('created_at')->limit(1)])
+            ->get()
+            ->keyBy(fn (Staff $s) => $this->normalizeSnils($s->snils));
 
-        if ($remaining > 0) {
-            $misOffset = max(0, $offset - $manualTotal);
-            $doctors = MisDoctor::getSlice($searchValue, $misOffset, $remaining);
-
-            $snilsList = $doctors->map(fn ($d) => $this->normalizeSnils($d['snils'] ?? null))->filter()->values();
-
-            $matchedStaff = Staff::query()
-                ->bySnilsIn($snilsList)
-                ->with(['certification' => fn ($q) => $q->latest('created_at')->limit(1)])
-                ->get()
-                ->keyBy(fn (Staff $s) => $this->normalizeSnils($s->snils));
-
-            $rows = $rows->concat(
-                $doctors->map(fn ($doctor) => $this->presentMisDoctorRow($doctor, $matchedStaff, $divisions))
-            );
-        }
+        $rows = $doctors->map(fn ($doctor) => $this->presentMisDoctorRow($doctor, $matchedStaff, $divisions));
 
         $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
             $rows->values(),
@@ -311,25 +372,6 @@ class CertificateController extends Controller
         );
 
         return $paginator->toArray();
-    }
-
-    private function presentManualStaffRow(Staff $staff, Collection $divisions): array
-    {
-        $certification = $staff->certification;
-
-        return [
-            'id' => "staff-{$staff->id}",
-            'staff_id' => $staff->id,
-            'mis_user_id' => null,
-            'fio' => $staff->full_name,
-            'position' => $staff->job_title,
-            'division_id' => $staff->division_id,
-            'division' => $divisions->get($staff->division_id)?->label,
-            'snils' => $staff->snils,
-            'cert_status' => $certification?->status(),
-            'has_certificate' => $certification !== null,
-            'source' => 'manual',
-        ];
     }
 
     private function presentMisDoctorRow(array $doctor, Collection $matchedStaff, Collection $divisions): array
@@ -371,15 +413,13 @@ class CertificateController extends Controller
             ->values();
     }
 
-    private function buildStats(Collection $certifications): array
+    private function buildStats(): array
     {
-        $statuses = $certifications->map(fn (Certification $c) => $c->status());
-
         return [
-            'total' => $certifications->count(),
-            'valid' => $statuses->filter(fn ($s) => $s === 'valid')->count(),
-            'expiring' => $statuses->filter(fn ($s) => $s === 'expiring')->count(),
-            'expired' => $statuses->filter(fn ($s) => in_array($s, ['expired', 'revoked']))->count(),
+            'total' => $this->statusQuery('all')->count(),
+            'valid' => $this->statusQuery('valid')->count(),
+            'expiring' => $this->statusQuery('expiring')->count(),
+            'expired' => $this->statusQuery('expired')->count(),
         ];
     }
 

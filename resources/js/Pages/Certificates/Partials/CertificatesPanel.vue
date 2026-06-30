@@ -5,10 +5,11 @@ import {
     NProgress, NPopconfirm, NText, NSkeleton, NResult, NPagination, NSpace, NEl
 } from "naive-ui"
 import {computed, h, ref, watch} from "vue"
+import {router} from "@inertiajs/vue3"
 import {
     IconLayoutList, IconLayoutGrid, IconLayoutSidebarRightExpand,
     IconDownload, IconBan, IconEye, IconCertificate, IconCheck, IconClock, IconAlertTriangle,
-    IconRefresh, IconShield
+    IconRefresh, IconShield, IconFileZip, IconFileSpreadsheet
 } from "@tabler/icons-vue"
 import {useCheckScope} from "@/Composables/useCheckScope.js"
 import {certificateStatusDef, certificateDaysLabel, certificateDaysLeft, staffInitials, avatarColor} from "@/Utils/certificateStatus.js"
@@ -18,7 +19,7 @@ import EdsWidget from "@/Components/Eds/EdsWidget.vue";
 const {hasScope, scopes} = useCheckScope()
 
 const props = defineProps({
-    certificates: Array,
+    directory: Object,
     stats: Object,
     revoking: Boolean,
 })
@@ -31,39 +32,76 @@ function renderIcon(icon) {
 
 const layout = ref("table")
 const viewState = ref("data")
-const statusFilter = ref("all")
-const selectedId = ref(props.certificates[0]?.id ?? null)
+const loading = ref(false)
+const checkedRowKeys = ref([])
 
-const filtered = computed(() => props.certificates.filter(c => {
-    if (statusFilter.value === "valid") return c.status === "valid"
-    if (statusFilter.value === "expiring") return c.status === "expiring"
-    if (statusFilter.value === "expired") return c.status === "expired" || c.status === "revoked"
-    return true
-}))
+// Selected rows can come from a page that's no longer loaded once the user
+// pages on — remember every row we've ever seen so bulk actions still know
+// each checked id's staff_id.
+const knownRows = ref(new Map())
+watch(() => props.directory.data, (rows) => {
+    rows.forEach(row => knownRows.value.set(row.id, row))
+}, {immediate: true})
 
-const page = ref(1)
-const pageSize = ref(12)
-const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
-watch([filtered, layout], () => {
-    page.value = 1
+function fetchDirectory(query) {
+    router.get(route("certificates.index"), query, {
+        preserveState: true,
+        onStart: () => { loading.value = true },
+        onFinish: () => { loading.value = false },
+        onSuccess: () => {
+            paginationReactive.value = {
+                ...paginationReactive.value,
+                page: props.directory.current_page,
+                pageSize: props.directory.per_page,
+                pageCount: props.directory.last_page,
+            }
+        }
+    })
+}
+
+const statusFilterValue = ref(router.page.props.ziggy.query.status ?? "all")
+const statusFilter = computed({
+    get() { return statusFilterValue.value },
+    set(value) {
+        statusFilterValue.value = value
+        checkedRowKeys.value = []
+        fetchDirectory({...router.page.props.ziggy.query, status: value, page: 1})
+    }
 })
 
-const paged = computed(() => {
-    const start = (page.value - 1) * pageSize.value
-    return filtered.value.slice(start, start + pageSize.value)
-})
-
-const tablePagination = computed(() => ({
-    page: page.value,
-    pageSize: pageSize.value,
-    itemCount: filtered.value.length,
+const paginationReactive = ref({
+    page: props.directory.current_page,
+    pageSize: props.directory.per_page,
+    pageCount: props.directory.last_page,
     showSizePicker: true,
-    pageSizes: [12, 25, 50],
-    onChange: (p) => { page.value = p },
-    onUpdatePageSize: (ps) => { pageSize.value = ps; page.value = 1 },
-}))
+    pageSizes: [12, 24, 48],
+    onChange: (page) => fetchDirectory({...router.page.props.ziggy.query, page}),
+    onUpdatePageSize: (pageSize) => fetchDirectory({...router.page.props.ziggy.query, page: 1, page_size: pageSize}),
+})
 
-const selected = computed(() => filtered.value.find(c => c.id === selectedId.value) ?? filtered.value[0] ?? null)
+function handleCheckedRowKeysChange(rowKeys) {
+    checkedRowKeys.value = rowKeys
+}
+
+const checkedStaffIds = computed(() => checkedRowKeys.value
+    .map(id => knownRows.value.get(id)?.staff_id)
+    .filter(Boolean))
+
+const checkedDownloadUrl = computed(() => route("certification.download", {staff_ids: checkedStaffIds.value}, true))
+
+function onExportSelected() {
+    window.location.href = route("staff.export", {
+        _query: {staff_ids: checkedStaffIds.value}
+    })
+}
+
+const selectedId = ref(props.directory.data[0]?.id ?? null)
+watch(() => props.directory.data, (rows) => {
+    if (!rows.find(r => r.id === selectedId.value)) {
+        selectedId.value = rows[0]?.id ?? null
+    }
+})
+const selected = computed(() => props.directory.data.find(c => c.id === selectedId.value) ?? null)
 
 function downloadUrl(cert) {
     return route("certification.download", {staff_ids: [cert.staff_id]}, true)
@@ -80,7 +118,10 @@ function progressPercentage(cert) {
     return Math.max(0, Math.min(100, Math.round(100 - (days / 365) * 100)))
 }
 
-const columns = [
+const columnsRef = ref([
+    {
+        type: "selection",
+    },
     {
         title: "Владелец",
         key: "fio",
@@ -130,6 +171,8 @@ const columns = [
         title: "Срок действия",
         key: "valid_to",
         width: 190,
+        sortOrder: false,
+        sorter: true,
         render(row) {
             return h("div", null, [
                 h("div", {class: "text-xs"}, [
@@ -162,7 +205,27 @@ const columns = [
             ])
         }
     }
-]
+])
+
+function handleSorterChange(sorter) {
+    const order = sorter.order === false ? "default" : sorter.order.replace("end", "")
+    router.visit(route("certificates.index", {...router.page.props.ziggy.query, sort_key: sorter.columnKey, sort_order: order, page: 1}), {
+        preserveState: true,
+        onStart: () => { loading.value = true },
+        onFinish: () => { loading.value = false },
+        onSuccess: () => {
+            const query = router.page.props.ziggy.query
+            const col = columnsRef.value.find(itm => itm.key === query.sort_key)
+            if (col) col.sortOrder = query.sort_order === 'default' ? false : `${query.sort_order}end`
+            paginationReactive.value = {
+                ...paginationReactive.value,
+                page: props.directory.current_page,
+                pageSize: props.directory.per_page,
+                pageCount: props.directory.last_page,
+            }
+        }
+    })
+}
 </script>
 
 <template>
@@ -223,7 +286,7 @@ const columns = [
         </NGrid>
 
         <NFlex justify="space-between" align="center" :wrap="true">
-            <NRadioGroup v-model:value="statusFilter">
+            <NRadioGroup v-model:value="statusFilter" :disabled="loading">
                 <NRadioButton label="Все" value="all" />
                 <NRadioButton label="Действительны" value="valid" />
                 <NRadioButton label="Истекают" value="expiring" />
@@ -231,6 +294,20 @@ const columns = [
             </NRadioGroup>
 
             <NFlex align="center" :size="20">
+                <NFlex v-if="layout === 'table' && checkedRowKeys.length" align="center" :size="12">
+                    <NButton v-if="hasScope(scopes.CAN_DOWNLOAD_CERTIFICATION)" tag="a" target="_blank" secondary :href="checkedDownloadUrl">
+                        <template #icon>
+                            <NIcon :component="IconFileZip" />
+                        </template>
+                        Скачать ({{ checkedRowKeys.length }})
+                    </NButton>
+                    <NButton secondary @click="onExportSelected">
+                        <template #icon>
+                            <NIcon :component="IconFileSpreadsheet" />
+                        </template>
+                        Экспортировать в Excel
+                    </NButton>
+                </NFlex>
                 <NRadioGroup v-model:value="layout">
                     <NRadioButton value="table">
                         <NIcon :component="IconLayoutList" />
@@ -268,7 +345,7 @@ const columns = [
             </NResult>
         </NCard>
 
-        <NEmpty v-else-if="viewState === 'empty' || !filtered.length" description="Сертификаты не найдены" class="py-20">
+        <NEmpty v-else-if="viewState === 'empty' || !directory.data.length" description="Сертификаты не найдены" class="py-20">
             <template #icon>
                 <NIcon :component="IconCertificate" />
             </template>
@@ -280,18 +357,22 @@ const columns = [
         </NEmpty>
 
         <template v-else-if="layout === 'table'">
-            <NDataTable size="small"
-                        :columns="columns"
-                        :data="filtered"
+            <NDataTable remote size="small"
+                        :columns="columnsRef"
+                        :data="directory.data"
                         min-height="calc(100vh - 388px)"
                         max-height="calc(100vh - 388px)"
                         :row-key="row => row.id"
-                        :pagination="tablePagination" />
+                        :checked-row-keys="checkedRowKeys"
+                        :loading="loading"
+                        @update:checked-row-keys="handleCheckedRowKeysChange"
+                        @update:sorter="handleSorterChange"
+                        :pagination="paginationReactive" />
         </template>
 
         <template v-else-if="layout === 'cards'">
             <NGrid :cols="4" :x-gap="16" :y-gap="16" class="min-h-[calc(100vh-350px)]">
-                <NGi v-for="cert in paged" :key="cert.id">
+                <NGi v-for="cert in directory.data" :key="cert.id">
                     <NCard hoverable class="cursor-pointer" @click="emit('open-detail', cert)">
                         <NFlex align="center" :wrap="false" class="mb-3">
                             <NAvatar round :color="avatarColor(cert.staff_id)" style="color:#fff;font-weight:600;flex:none">
@@ -319,7 +400,9 @@ const columns = [
                 </NGi>
             </NGrid>
             <NFlex justify="end">
-                <NPagination v-model:page="page" v-model:page-size="pageSize" :item-count="filtered.length" show-size-picker :page-sizes="[12, 24, 48]" />
+                <NPagination :page="paginationReactive.page" :page-size="paginationReactive.pageSize" :page-count="paginationReactive.pageCount"
+                             show-size-picker :page-sizes="paginationReactive.pageSizes"
+                             @update:page="paginationReactive.onChange" @update:page-size="paginationReactive.onUpdatePageSize" />
             </NFlex>
         </template>
 
@@ -327,7 +410,7 @@ const columns = [
             <NGrid :cols="3" :x-gap="16">
                 <NGi :span="1">
                     <NCard content-style="padding:0" content-class="h-[calc(100vh-350px)]" content-scrollable>
-                        <div v-for="cert in paged" :key="cert.id"
+                        <div v-for="cert in directory.data" :key="cert.id"
                              class="flex items-center gap-3 px-4 py-3 border-b border-[var(--n-border-color)] transition-colors cursor-pointer hover:bg-[var(--n-close-color-hover)]"
                              :class="{'bg-[var(--n-close-color-pressed)]': cert.id === selected?.id}"
                              @click="selectedId = cert.id"
@@ -342,7 +425,9 @@ const columns = [
                         </div>
                     </NCard>
                     <NFlex justify="center" class="mt-3">
-                        <NPagination v-model:page="page" v-model:page-size="pageSize" :item-count="filtered.length" :page-sizes="[12, 24, 48]" simple />
+                        <NPagination :page="paginationReactive.page" :page-size="paginationReactive.pageSize" :page-count="paginationReactive.pageCount"
+                                     :page-sizes="paginationReactive.pageSizes" simple
+                                     @update:page="paginationReactive.onChange" @update:page-size="paginationReactive.onUpdatePageSize" />
                     </NFlex>
                 </NGi>
                 <NGi :span="2">

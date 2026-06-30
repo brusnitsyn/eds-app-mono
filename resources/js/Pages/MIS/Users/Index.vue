@@ -49,7 +49,7 @@ const rowOptions = [
                 staff: row.id,
             }), {
                 onSuccess: () => {
-                    router.visit(route('staff.index'))
+                    router.visit(route('mis.users'))
                 }
             })
         },

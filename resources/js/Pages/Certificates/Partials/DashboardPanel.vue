@@ -90,7 +90,7 @@ function eventColor(type) {
 
         <NGrid :cols="24" :x-gap="16">
             <NGi :span="14">
-                <EdsWidget header="Истекают в ближайшие 30 дней" class="h-full" content-class="relative">
+                <EdsWidget header="Истекают в ближайшие 30 дней" class="max-h-[420px] overflow-hidden" content-class="relative" content-scrollable>
                     <template #header-extra>
                         <Link :href="route('certificates.index')">
                             <NButton text type="primary">

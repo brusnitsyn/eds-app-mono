@@ -7,8 +7,7 @@ import CertificateHeaderActions from "./Partials/CertificateHeaderActions.vue"
 import CertificateOverlays from "./Partials/CertificateOverlays.vue"
 
 defineProps({
-    certificates: Array,
-    staff: Array,
+    directory: Object,
     stats: Object,
 })
 
@@ -29,9 +28,9 @@ function revoke(cert) {
             <CertificateHeaderActions @open-search="overlays.openSearch()" @open-wizard="overlays.openWizard()" />
         </template>
 
-        <CertificatesPanel :certificates="certificates" :stats="stats" :revoking="revokeForm.processing"
+        <CertificatesPanel :directory="directory" :stats="stats" :revoking="revokeForm.processing"
                             @open-detail="overlays.openDetail($event)" @open-wizard="overlays.openWizard()" @revoke="revoke" />
 
-        <CertificateOverlays ref="overlays" :certificates="certificates" :staff="staff" :revoking="revokeForm.processing" @revoke="revoke" />
+        <CertificateOverlays ref="overlays" :revoking="revokeForm.processing" @revoke="revoke" />
     </AppLayout>
 </template>

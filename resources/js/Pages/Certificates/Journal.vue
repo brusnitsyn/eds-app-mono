@@ -7,8 +7,6 @@ import CertificateHeaderActions from "./Partials/CertificateHeaderActions.vue"
 import CertificateOverlays from "./Partials/CertificateOverlays.vue"
 
 defineProps({
-    certificates: Array,
-    staff: Array,
     journalEvents: Array,
 })
 
@@ -31,6 +29,6 @@ function revoke(cert) {
 
         <JournalPanel :events="journalEvents" />
 
-        <CertificateOverlays ref="overlays" :certificates="certificates" :staff="staff" :revoking="revokeForm.processing" @revoke="revoke" />
+        <CertificateOverlays ref="overlays" :revoking="revokeForm.processing" @revoke="revoke" />
     </AppLayout>
 </template>

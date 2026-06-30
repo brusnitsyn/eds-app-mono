@@ -19,7 +19,10 @@ Route::middleware([
         return redirect(route('dashboard'));
     });
 
-    Route::resource('staff', \App\Http\Controllers\StaffController::class);
+    // index excluded: GET /staff is owned by CertificateController::staff() below
+    // (Certificates/Staff.vue) — the page Staff/Index.vue used to serve is no
+    // longer linked from navigation.
+    Route::resource('staff', \App\Http\Controllers\StaffController::class)->except(['index']);
     Route::get('/reports/export', [\App\Http\Controllers\ReportController::class, 'reportExcel'])->name('staff.export');
     Route::get('/certification/download/{staff_ids}', [\App\Http\Controllers\StaffController::class, 'downloadCertificates'])->name('certification.download');
     Route::post('/certification/install', [\App\Http\Controllers\StaffController::class, 'installCertificates'])->name('certification.install');
@@ -31,6 +34,7 @@ Route::middleware([
 
     Route::prefix('certificates')->name('certificates.')->group(function () {
         Route::get('/', [\App\Http\Controllers\CertificateController::class, 'index'])->name('index');
+        Route::get('/search', [\App\Http\Controllers\CertificateController::class, 'search'])->name('search');
         Route::post('/settings/test-parser', [\App\Http\Controllers\CertificateController::class, 'testParser'])->name('settings.test-parser');
         Route::post('/{certification}/revoke', [\App\Http\Controllers\CertificateController::class, 'revoke'])->name('revoke');
 

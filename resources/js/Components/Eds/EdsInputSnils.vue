@@ -1,7 +1,7 @@
 <script setup>
 import {NInput} from "naive-ui";
 
-const value = defineModel('value`')
+const value = defineModel('value')
 </script>
 
 <template>

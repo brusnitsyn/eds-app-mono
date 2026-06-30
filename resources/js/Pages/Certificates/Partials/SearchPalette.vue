@@ -1,38 +1,44 @@
 <script setup>
 import {computed, nextTick, onUnmounted, ref, watch} from "vue"
-import {NModal, NInput, NIcon, NEmpty, NScrollbar, NTag, NAvatar, NButton} from "naive-ui"
+import {watchDebounced} from "@vueuse/core"
+import {NModal, NInput, NIcon, NEmpty, NScrollbar, NTag, NAvatar, NButton, NSpin} from "naive-ui"
 import {IconSearch, IconCornerDownLeft} from "@tabler/icons-vue"
 import {staffInitials, avatarColor} from "@/Utils/certificateStatus.js"
 import StatusTag from "./StatusTag.vue"
 
 const show = defineModel("show")
 
-const props = defineProps({
-    certificates: Array,
-    staff: Array,
-})
-
 const emit = defineEmits(["select-certificate", "select-staff"])
 
 const query = ref("")
 const inputRef = ref(null)
 const activeIndex = ref(0)
+const certResults = ref([])
+const staffResults = ref([])
+const searching = ref(false)
 
-const certResults = computed(() => {
-    const q = query.value.trim().toLowerCase()
-    if (!q) return []
-    return props.certificates
-        .filter(c => `${c.fio} ${c.snils} ${c.serial_number}`.toLowerCase().includes(q))
-        .slice(0, 6)
-})
+let requestToken = 0
 
-const staffResults = computed(() => {
-    const q = query.value.trim().toLowerCase()
-    if (!q) return []
-    return props.staff
-        .filter(p => `${p.fio} ${p.snils} ${p.position}`.toLowerCase().includes(q))
-        .slice(0, 6)
-})
+async function runSearch(q) {
+    const token = ++requestToken
+    if (!q) {
+        certResults.value = []
+        staffResults.value = []
+        searching.value = false
+        return
+    }
+    searching.value = true
+    try {
+        const {data} = await window.axios.get(route("certificates.search"), {params: {q}})
+        if (token !== requestToken) return
+        certResults.value = data.certificates
+        staffResults.value = data.staff
+    } finally {
+        if (token === requestToken) searching.value = false
+    }
+}
+
+watchDebounced(query, (q) => runSearch(q.trim()), {debounce: 300})
 
 const flatResults = computed(() => [
     ...certResults.value.map(item => ({type: "cert", item})),
@@ -108,10 +114,13 @@ function onKeydown(e) {
         </div>
 
         <NScrollbar style="max-height: 360px">
-            <NEmpty v-if="query && !flatResults.length" description="Ничего не найдено" class="py-12" />
-            <div v-else-if="!query" class="py-12 text-center text-[var(--n-close-icon-color)] text-sm">
+            <div v-if="!query" class="py-12 text-center text-[var(--n-close-icon-color)] text-sm">
                 Начните вводить ФИО, СНИЛС или номер сертификата…
             </div>
+            <div v-else-if="searching && !flatResults.length" class="py-12 flex justify-center">
+                <NSpin size="small" />
+            </div>
+            <NEmpty v-else-if="!flatResults.length" description="Ничего не найдено" class="py-12" />
             <div v-else class="py-2">
                 <template v-if="certResults.length">
                     <div class="px-4 pt-2 pb-1 text-xs text-[var(--n-close-icon-color)] uppercase tracking-wide">Сертификаты</div>

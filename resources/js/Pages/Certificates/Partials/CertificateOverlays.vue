@@ -5,9 +5,7 @@ import UploadWizardModal from "./UploadWizardModal.vue"
 import SearchPalette from "./SearchPalette.vue"
 import CertificateDetailDrawer from "./CertificateDetailDrawer.vue"
 
-const props = defineProps({
-    certificates: {type: Array, default: () => []},
-    staff: {type: Array, default: () => []},
+defineProps({
     revoking: Boolean,
 })
 
@@ -18,12 +16,10 @@ const emit = defineEmits(["revoke"])
 const wizardOpen = ref(false)
 const detailOpen = ref(false)
 const searchOpen = ref(false)
-const selectedId = ref(null)
-
-const selected = computed(() => props.certificates.find(c => c.id === selectedId.value) ?? null)
+const selected = ref(null)
 
 function openDetail(cert) {
-    selectedId.value = cert.id
+    selected.value = cert
     detailOpen.value = true
 }
 
@@ -55,8 +51,7 @@ defineExpose({openDetail, openWizard, openSearch})
 <template>
     <UploadWizardModal v-model:show="wizardOpen" />
 
-    <SearchPalette v-model:show="searchOpen" :certificates="certificates" :staff="staff"
-                   @select-certificate="openDetail" @select-staff="onSelectStaff" />
+    <SearchPalette v-model:show="searchOpen" @select-certificate="openDetail" @select-staff="onSelectStaff" />
 
     <CertificateDetailDrawer v-model:show="detailOpen" :certificate="selected" :revoking="revoking" :trusted-cas="trustedCas"
                               @revoke="cert => emit('revoke', cert)" @renew="openWizard" />
