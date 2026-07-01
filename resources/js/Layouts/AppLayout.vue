@@ -8,7 +8,7 @@ import {
     IconUsers,
     IconMenu3,
     IconTable,
-    IconUser, IconDatabaseEdit,
+    IconUser,
     IconCertificate,
     IconLayoutDashboard,
     IconHistory,
@@ -141,12 +141,6 @@ const rawMenuOptions = computed(() => [
             //     icon: renderIcon(IconTable),
             //     show: hasScope(scopes.CAN_READ_JOURNALS)
             // },
-            {
-                label: renderLinkLabel('ТМ:МИС', route('mis.index')),
-                key: 'mis',
-                icon: renderIcon(IconDatabaseEdit),
-                show: (hasRole(roles.ROLE_HELPER_MIS) || hasRole(roles.ROLE_ADMIN))
-            },
             {
                 label: renderLinkLabel('Администрирование', route('admin.index')),
                 key: 'admin',

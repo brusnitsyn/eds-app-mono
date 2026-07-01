@@ -71,6 +71,13 @@ const updateDepartment = (value) => {
     form.department_type_id = departmentType.value
 }
 
+watch(() => form.prvd_id, (value) => {
+    const selected = props.prvd?.find(itm => itm.value === value)
+    if (selected) {
+        form.name = selected.name
+    }
+})
+
 const submit = () => {
     if (editMode.value) {
         form.transform((data) => ({
@@ -78,7 +85,8 @@ const submit = () => {
             id: props.post.id,
             department_profile_id: data.department_profile_id ?? 0,
             department_type_id: data.department_type_id ?? 0,
-            guid: props.post.guid
+            guid: props.post.guid,
+            name: data.name || props.prvd?.find(itm => itm.value === data.prvd_id)?.name || ''
         })).submit('put', route('mis.users.user.post.update', { userId: props.user.id }), {
             onSuccess: () => {
                 show.value = false
@@ -94,7 +102,7 @@ const submit = () => {
     form.transform((data) => ({
         ...data,
         rate: data.rate.toFixed(2),
-        name: data.name === null || data.name === '' ? props.prvd.find(itm => itm.value === form.prvd_id).name : data.name
+        name: data.name || props.prvd?.find(itm => itm.value === data.prvd_id)?.name || ''
     }))
         .submit('post', route('mis.users.post.create', {userId: props.user.id}), {
             onSuccess: () => {

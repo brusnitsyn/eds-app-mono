@@ -451,7 +451,7 @@ class MisController extends Controller
             'create_user_id' => $userId
         ]);
 
-        return redirect(route('mis.templates.roles'));
+        return redirect(route('staff'));
     }
 
     public function updateTemplate(MisRoleTemplate $template, Request $request)
@@ -462,7 +462,7 @@ class MisController extends Controller
 
         $template->update($data);
 
-        return redirect(route('mis.templates.roles'));
+        return redirect(route('staff'));
     }
 
     public function importDoctors(Request $request)

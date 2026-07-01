@@ -6,10 +6,12 @@ use App\Actions\Eds\ReadCertificate;
 use App\Facades\MisDoctor;
 use App\Models\Certification;
 use App\Models\Division;
+use App\Models\MisRoleTemplate;
 use App\Models\Staff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -51,9 +53,26 @@ class CertificateController extends Controller
 
     public function staff(Request $request)
     {
+        $templates = MisRoleTemplate::with(['createUser'])->get();
+        $misRolesCache = Cache::get('mis_roles', collect());
+
+        if ($misRolesCache instanceof \Illuminate\Support\Collection && $misRolesCache->isNotEmpty()) {
+            $templates = $templates->map(function ($template) use ($misRolesCache) {
+                $roles = collect($template->roles)->map(function ($role) use ($misRolesCache) {
+                    $match = $misRolesCache->firstWhere('RoleID', (string) $role);
+                    return ['RoleID' => $role, 'Name' => $match ? $match['Name'] : ''];
+                });
+                return [...$template->toArray(), 'roles' => $roles];
+            });
+        }
+
         return Inertia::render('Certificates/Staff', [
             'directory' => $this->staffDirectory($request),
             'mis' => $this->misStats(),
+            'templates' => $templates,
+            'roles' => $misRolesCache instanceof \Illuminate\Support\Collection
+                ? $misRolesCache->map(fn($i) => ['RoleID' => (int)$i['RoleID'], 'Name' => $i['Name']])->values()
+                : collect(),
         ]);
     }
 
