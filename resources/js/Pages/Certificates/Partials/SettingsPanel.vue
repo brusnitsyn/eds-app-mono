@@ -3,7 +3,7 @@ import {NCard, NDescriptions, NDescriptionsItem, NTag, NButton, NIcon, NFlex, NA
 import {ref} from "vue"
 import {router, useForm} from "@inertiajs/vue3"
 import {useStorage} from "@vueuse/core"
-import {IconPlugConnected, IconArrowRight, IconCertificate, IconTrash, IconUpload} from "@tabler/icons-vue"
+import {IconPlugConnected, IconArrowRight, IconCertificate, IconTrash, IconUpload, IconDownload, IconDeviceDesktopCheck} from "@tabler/icons-vue"
 import {useCheckScope} from "@/Composables/useCheckScope.js"
 
 const props = defineProps({
@@ -11,7 +11,38 @@ const props = defineProps({
     storage: Object,
     mis: Object,
     trustedCas: {type: Array, default: () => []},
+    workstationSoftware: {type: Object, default: () => ({})},
 })
+
+const SW_KEYS = [
+    {key: 'chromium_gost',    label: 'Chromium GOST'},
+    {key: 'cryptopro_plugin', label: 'КриптоПро ЭЦП Browser Plug-in'},
+    {key: 'cryptopro_csp',    label: 'КриптоПро CSP'},
+]
+
+const swForm = useForm({key: '', version: '', file: null})
+
+function uploadSoftware(key) {
+    swForm.key = key
+    swForm.post(route('workstation-software.store'), {
+        forceFormData: true,
+        onSuccess: () => {
+            swForm.reset()
+            window.$message?.success('Файл загружен')
+        },
+    })
+}
+
+function deleteSoftware(id) {
+    router.delete(route('workstation-software.destroy', id), {
+        onSuccess: () => window.$message?.success('Файл удалён'),
+    })
+}
+
+function formatSize(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' МБ'
+    return (bytes / 1024).toFixed(0) + ' КБ'
+}
 
 const {hasScope, scopes} = useCheckScope()
 
@@ -177,6 +208,81 @@ function saveLocalSettings() {
                     Добавить
                 </NButton>
             </NFlex>
+        </NCard>
+
+        <NCard title="ПО для рабочего места">
+            <template #header-extra>
+                <NIcon :component="IconDeviceDesktopCheck" :depth="3" />
+            </template>
+            <NAlert type="info" :show-icon="false" class="mb-4">
+                Дистрибутивы, которые сотрудники смогут скачать со страницы «Проверка рабочего места».
+                Загрузите актуальные версии один раз — пользователи не будут уходить на внешние сайты.
+            </NAlert>
+            <NList bordered class="mb-4">
+                <NListItem v-for="item in SW_KEYS" :key="item.key">
+                    <NFlex align="center" justify="space-between" style="width:100%">
+                        <NFlex align="center" :size="10">
+                            <NIcon :component="IconDeviceDesktopCheck" :depth="3" />
+                            <div>
+                                <div class="font-medium">{{ item.label }}</div>
+                                <div v-if="workstationSoftware[item.key]" class="text-xs text-gray-400 dark:text-white/40">
+                                    {{ workstationSoftware[item.key].original_name }}
+                                    <template v-if="workstationSoftware[item.key].version">· v{{ workstationSoftware[item.key].version }}</template>
+                                    · {{ formatSize(workstationSoftware[item.key].file_size) }}
+                                </div>
+                                <div v-else class="text-xs text-gray-400 dark:text-white/40">Файл не загружен</div>
+                            </div>
+                        </NFlex>
+                        <NFlex align="center" :size="8" v-if="hasScope(scopes.CAN_ADMIN)">
+                            <NTag v-if="workstationSoftware[item.key]" size="small" type="success">Загружен</NTag>
+                            <NTag v-else size="small" type="default">Отсутствует</NTag>
+                            <NButton
+                                v-if="workstationSoftware[item.key]"
+                                size="small" quaternary
+                                tag="a"
+                                :href="route('workstation-software.download', workstationSoftware[item.key].id)"
+                                target="_blank"
+                            >
+                                <template #icon><NIcon :component="IconDownload" /></template>
+                            </NButton>
+                            <NUpload
+                                :max="1"
+                                :default-upload="false"
+                                :show-file-list="false"
+                                @change="(data) => { swForm.key = item.key; swForm.file = data.fileList[0]?.file ?? null }"
+                            >
+                                <NButton size="small" secondary :loading="swForm.processing && swForm.key === item.key">
+                                    <template #icon><NIcon :component="IconUpload" /></template>
+                                    {{ workstationSoftware[item.key] ? 'Обновить' : 'Загрузить' }}
+                                </NButton>
+                            </NUpload>
+                            <NInput
+                                v-model:value="swForm.version"
+                                placeholder="Версия"
+                                size="small"
+                                style="width:90px"
+                                v-if="swForm.key === item.key && swForm.file"
+                            />
+                            <NButton
+                                v-if="swForm.key === item.key && swForm.file"
+                                size="small" type="primary"
+                                :loading="swForm.processing"
+                                @click="uploadSoftware(item.key)"
+                            >
+                                Сохранить
+                            </NButton>
+                            <NPopconfirm v-if="workstationSoftware[item.key]" @positive-click="deleteSoftware(workstationSoftware[item.key].id)">
+                                <template #trigger>
+                                    <NButton size="small" quaternary circle type="error">
+                                        <template #icon><NIcon :component="IconTrash" /></template>
+                                    </NButton>
+                                </template>
+                                Удалить файл «{{ item.label }}»?
+                            </NPopconfirm>
+                        </NFlex>
+                    </NFlex>
+                </NListItem>
+            </NList>
         </NCard>
 
         <NCard title="Уведомления">

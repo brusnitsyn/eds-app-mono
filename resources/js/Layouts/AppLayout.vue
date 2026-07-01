@@ -12,7 +12,8 @@ import {
     IconCertificate,
     IconLayoutDashboard,
     IconHistory,
-    IconSettings
+    IconSettings,
+    IconDeviceDesktopCheck,
 } from '@tabler/icons-vue'
 import Banner from '@/Components/Banner.vue'
 import {NIcon, NFlex} from "naive-ui"
@@ -122,6 +123,12 @@ const rawMenuOptions = computed(() => [
                 icon: renderIcon(IconHistory),
                 show: hasScope(scopes.CAN_READ_STAFF)
             },
+            {
+                label: renderLinkLabel('Проверка рабочего места', route('workstation')),
+                key: 'workstation',
+                icon: renderIcon(IconDeviceDesktopCheck),
+                show: true,
+            },
         ].filter(item => item.show),
     },
     {
@@ -159,6 +166,7 @@ const CERTIFICATES_KEY_BY_PATH = {
     '/journal': 'journal',
     '/staff': 'staff',
     '/settings': 'settings',
+    '/workstation': 'workstation',
 }
 
 const userOptions = [

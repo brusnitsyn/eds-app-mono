@@ -27,6 +27,10 @@ Route::middleware([
     Route::get('/certification/download/{staff_ids}', [\App\Http\Controllers\StaffController::class, 'downloadCertificates'])->name('certification.download');
     Route::post('/certification/install', [\App\Http\Controllers\StaffController::class, 'installCertificates'])->name('certification.install');
 
+    Route::get('/workstation', [\App\Http\Controllers\WorkstationController::class, 'index'])->name('workstation');
+    Route::post('/workstation-software', [\App\Http\Controllers\WorkstationSoftwareController::class, 'store'])->name('workstation-software.store');
+    Route::delete('/workstation-software/{workstationSoftware}', [\App\Http\Controllers\WorkstationSoftwareController::class, 'destroy'])->name('workstation-software.destroy');
+    Route::get('/workstation-software/{workstationSoftware}/download', [\App\Http\Controllers\WorkstationSoftwareController::class, 'download'])->name('workstation-software.download');
     Route::get('/dashboard', [\App\Http\Controllers\CertificateController::class, 'dashboard'])->name('dashboard');
     Route::get('/journal', [\App\Http\Controllers\CertificateController::class, 'journal'])->name('journal');
     Route::get('/staff', [\App\Http\Controllers\CertificateController::class, 'staff'])->name('staff');

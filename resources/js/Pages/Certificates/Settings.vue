@@ -11,6 +11,7 @@ defineProps({
     storage: Object,
     mis: Object,
     trustedCas: Array,
+    workstationSoftware: {type: Object, default: () => ({})},
 })
 
 const overlays = ref(null)
@@ -30,7 +31,7 @@ function revoke(cert) {
             <CertificateHeaderActions @open-search="overlays.openSearch()" @open-wizard="overlays.openWizard()" />
         </template>
 
-        <SettingsPanel :parser="parser" :storage="storage" :mis="mis" :trusted-cas="trustedCas" />
+        <SettingsPanel :parser="parser" :storage="storage" :mis="mis" :trusted-cas="trustedCas" :workstation-software="workstationSoftware" />
 
         <CertificateOverlays ref="overlays" :revoking="revokeForm.processing" @revoke="revoke" />
     </AppLayout>

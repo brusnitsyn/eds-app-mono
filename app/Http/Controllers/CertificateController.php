@@ -91,6 +91,7 @@ class CertificateController extends Controller
                 ->orderBy('type')
                 ->orderBy('name')
                 ->get(),
+            'workstationSoftware' => \App\Models\WorkstationSoftware::all()->keyBy('key'),
         ]);
     }
 
