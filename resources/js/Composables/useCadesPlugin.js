@@ -1,4 +1,4 @@
-import {execute, isValidSystemSetup, getSystemInfo} from "crypto-pro-actual-cades-plugin"
+import {execute} from "crypto-pro-actual-cades-plugin"
 
 /**
  * Установка сертификата выполняется браузерным плагином КриптоПро (CAdESCOM)
@@ -7,11 +7,45 @@ import {execute, isValidSystemSetup, getSystemInfo} from "crypto-pro-actual-cade
  * сам закрытый ключ через этот API физически невозможно.
  */
 export function useCadesPlugin() {
+    /**
+     * Проверяет доступность плагина через реальный вызов CAdESCOM.About.
+     * Надёжнее isValidSystemSetup — работает с MV2 и MV3 расширениями.
+     * Возвращает версию плагина или null если плагин недоступен.
+     */
     async function isAvailable() {
         try {
-            return await isValidSystemSetup()
+            await execute(({cadesplugin}) => new Promise((resolve, reject) => {
+                cadesplugin.async_spawn(function* () {
+                    const oAbout = yield cadesplugin.CreateObjectAsync('CAdESCOM.About')
+                    yield oAbout.PluginVersion
+                    resolve()
+                }, resolve, reject)
+            }))
+            return true
         } catch {
             return false
+        }
+    }
+
+    /**
+     * Возвращает версию плагина и CSP, либо null при ошибке.
+     */
+    async function getSystemInfo() {
+        try {
+            return await execute(({cadesplugin}) => new Promise((resolve, reject) => {
+                cadesplugin.async_spawn(function* () {
+                    const oAbout = yield cadesplugin.CreateObjectAsync('CAdESCOM.About')
+                    const pluginVersion = yield oAbout.PluginVersion
+                    let cspVersion = null
+                    try {
+                        const cspVer = yield oAbout.CSPVersion('', 0)
+                        cspVersion = `${yield cspVer.MajorVersion}.${yield cspVer.MinorVersion}.${yield cspVer.BuildVersion}`
+                    } catch {}
+                    resolve({pluginVersion: String(pluginVersion), cspVersion})
+                }, resolve, reject)
+            }))
+        } catch {
+            return null
         }
     }
 
@@ -20,10 +54,17 @@ export function useCadesPlugin() {
      * @param {"Root"|"CA"|"My"} storeName Имя системного хранилища Windows
      */
     function installToStore(base64Content, storeName) {
+        // Убираем PEM-заголовки и все пробельные символы — CAdESCOM.Certificate.Import
+        // требует чистый base64 без переносов строк и без заголовков.
+        const clean = base64Content
+            .replace(/-----BEGIN CERTIFICATE-----/g, '')
+            .replace(/-----END CERTIFICATE-----/g, '')
+            .replace(/\s+/g, '')
+
         return execute(({cadesplugin}) => new Promise((resolve, reject) => {
             cadesplugin.async_spawn(function* () {
                 var oCertificate = yield cadesplugin.CreateObjectAsync("CAdESCOM.Certificate")
-                yield oCertificate.Import(base64Content)
+                yield oCertificate.Import(clean)
 
                 var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store")
                 yield oStore.Open(

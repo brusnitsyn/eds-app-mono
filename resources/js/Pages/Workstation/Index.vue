@@ -3,7 +3,9 @@ import AppLayout from "@/Layouts/AppLayout.vue"
 import CheckCard from "./Partials/CheckCard.vue"
 import {NButton, NIcon, NFlex, NAlert} from "naive-ui"
 import {IconRefresh, IconBrowser, IconPlugConnected, IconShieldCheck, IconDownload} from "@tabler/icons-vue"
-import {isValidSystemSetup, getSystemInfo} from "crypto-pro-actual-cades-plugin"
+import {useCadesPlugin} from "@/Composables/useCadesPlugin.js"
+
+const {isAvailable, getSystemInfo} = useCadesPlugin()
 
 const props = defineProps({
     software: {type: Object, default: () => ({})},
@@ -25,20 +27,14 @@ function checkBrowser() {
 async function checkPlugin() {
     pluginCheck.value.status = STATUS.PENDING
     cspCheck.value.status    = STATUS.PENDING
-    try {
-        const ok = await isValidSystemSetup()
-        pluginCheck.value.status = ok ? STATUS.OK : STATUS.FAIL
-        if (ok) {
-            const info = await getSystemInfo().catch(() => null)
-            pluginCheck.value.version = info?.pluginVersion ?? info?.PluginVersion ?? null
-            const cspVer = info?.cspVersion ?? info?.CspVersion ?? info?.CSPVersion ?? null
-            cspCheck.value = {status: cspVer ? STATUS.OK : STATUS.FAIL, version: cspVer}
-        } else {
-            cspCheck.value.status = STATUS.FAIL
-        }
-    } catch {
-        pluginCheck.value.status = STATUS.FAIL
-        cspCheck.value.status    = STATUS.FAIL
+    const ok = await isAvailable()
+    pluginCheck.value.status = ok ? STATUS.OK : STATUS.FAIL
+    if (ok) {
+        const info = await getSystemInfo()
+        pluginCheck.value.version = info?.pluginVersion ?? null
+        cspCheck.value = {status: info?.cspVersion ? STATUS.OK : STATUS.FAIL, version: info?.cspVersion ?? null}
+    } else {
+        cspCheck.value.status = STATUS.FAIL
     }
 }
 
