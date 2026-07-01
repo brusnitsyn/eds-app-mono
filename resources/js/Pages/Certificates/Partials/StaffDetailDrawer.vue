@@ -185,7 +185,7 @@ const certDrawerOpen = ref(false)
 </script>
 
 <template>
-    <NDrawer v-model:show="show" width="560" native-scrollbar block-scroll @mousedown.capture="handleDrawerMousedown">
+    <NDrawer v-model:show="show" width="45%" native-scrollbar block-scroll @mousedown.capture="handleDrawerMousedown">
         <NDrawerContent title="Сведения о сотруднике" closable v-if="row">
             <NFlex align="center" :size="16" class="mb-6">
                 <NAvatar round :size="60" :color="avatarColor(row.mis_user_id ?? row.staff_id ?? 0)" style="color:#fff;font-weight:600;font-size:20px">
