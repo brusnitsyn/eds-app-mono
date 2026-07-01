@@ -60,7 +60,8 @@ class CertificateController extends Controller
             $templates = $templates->map(function ($template) use ($misRolesCache) {
                 $roles = collect($template->roles)->map(function ($role) use ($misRolesCache) {
                     $match = $misRolesCache->firstWhere('RoleID', (string) $role);
-                    return ['RoleID' => $role, 'Name' => $match ? $match['Name'] : ''];
+                    $name = $match ? (is_array($match) ? $match['Name'] : $match->Name) : '';
+                    return ['RoleID' => $role, 'Name' => $name];
                 });
                 return [...$template->toArray(), 'roles' => $roles];
             });
@@ -71,7 +72,9 @@ class CertificateController extends Controller
             'mis' => $this->misStats(),
             'templates' => $templates,
             'roles' => $misRolesCache instanceof \Illuminate\Support\Collection
-                ? $misRolesCache->map(fn($i) => ['RoleID' => (int)$i['RoleID'], 'Name' => $i['Name']])->values()
+                ? $misRolesCache->map(function ($i) {
+                    return ['RoleID' => (int)(is_array($i) ? $i['RoleID'] : $i->RoleID), 'Name' => is_array($i) ? $i['Name'] : $i->Name];
+                })->values()
                 : collect(),
         ]);
     }
