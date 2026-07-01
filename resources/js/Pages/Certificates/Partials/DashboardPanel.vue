@@ -1,7 +1,8 @@
 <script setup>
 import {
     NGrid, NGi, NCard, NStatistic, NFlex, NIcon, NButton, NTag, NTime, NEmpty,
-    NList, NListItem, NThing, NAvatar, NText, NSpace
+    NList, NListItem, NThing, NAvatar, NText, NSpace,
+    NEllipsis
 } from "naive-ui"
 import {Link} from "@inertiajs/vue3"
 import {IconCircleCheck, IconClock, IconArrowRight} from "@tabler/icons-vue"
@@ -69,7 +70,11 @@ function eventColor(type) {
                             <span>Покрытие УКЭП</span>
                         </NSpace>
                     </template>
-                    <NStatistic :value="dashboard.coverage" suffix="%" />
+                    <NStatistic :value="dashboard.coverage">
+                        <template #suffix>
+                            %
+                        </template>
+                    </NStatistic>
                     <div class="text-xs text-[var(--n-close-icon-color)] mt-2">сотрудников с сертификатом</div>
                 </EdsWidget>
             </NGi>
@@ -90,7 +95,7 @@ function eventColor(type) {
 
         <NGrid :cols="24" :x-gap="16">
             <NGi :span="14">
-                <EdsWidget header="Истекают в ближайшие 30 дней" class="max-h-[420px] overflow-hidden" content-class="relative" content-scrollable>
+                <EdsWidget header="Истекают в ближайшие 30 дней" class="max-h-[240px] overflow-hidden" content-class="relative" content-scrollable>
                     <template #header-extra>
                         <Link :href="route('certificates.index')">
                             <NButton text type="primary">
@@ -110,12 +115,15 @@ function eventColor(type) {
                                         {{ staffInitials(cert.fio) }}
                                     </NAvatar>
                                 </template>
-                                <template #header>{{ cert.fio }}</template>
+                                <template #header>
+                                    <NText style="font-size: var(--n-font-size)">
+                                        {{ cert.fio }}
+                                    </NText>
+                                </template>
                                 <template #description>
-                                    <NFlex :size="4" align="center">
-                                        <span>{{ cert.position }} · до</span>
-                                        <NTime format="dd.MM.yyyy" :time="Number(cert.valid_to)" />
-                                    </NFlex>
+                                    <NText style="font-size: var(--n-font-size)">
+                                        <NEllipsis style="max-width: 240px">{{ cert.position }}</NEllipsis> · до <NTime format="dd.MM.yyyy" :time="Number(cert.valid_to)" />
+                                    </NText>
                                 </template>
                                 <template #header-extra>
                                     <NFlex align="center" :size="8">
@@ -165,9 +173,13 @@ function eventColor(type) {
                     <NTag size="small" :type="event.type === 'revoke' ? 'error' : 'success'">
                         {{ event.type === "revoke" ? "Отзыв" : "Загрузка" }}
                     </NTag>
-                    <NTime :time="new Date(event.time)" format="HH:mm" class="text-xs flex-none" style="width: 40px; text-align: right" />
+                    <NTime :time="new Date(event.time)" format="dd.MM.yyyy HH:mm" class="text-xs flex-none" style="width: 100px; text-align: right" />
                 </NFlex>
             </NFlex>
         </EdsWidget>
     </NFlex>
 </template>
+
+<style>
+
+</style>
