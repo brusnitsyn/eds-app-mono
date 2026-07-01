@@ -8,21 +8,24 @@ import {execute, getSystemInfo as _cadesGetSystemInfo} from "crypto-pro-actual-c
  */
 export function useCadesPlugin() {
     /**
-     * Проверяет доступность плагина через реальный вызов CAdESCOM.About.
-     * Надёжнее isValidSystemSetup — работает с MV2 и MV3 расширениями.
+     * Проверяет доступность плагина через реальный вызов CAdESCOM.Certificate.
+     * MV3 service worker может не успеть стартовать к первому вызову,
+     * поэтому при неудаче делается повторная попытка через 2 секунды.
      */
     async function isAvailable() {
-        try {
-            await execute(({cadesplugin}) => new Promise((resolve, reject) => {
-                cadesplugin.async_spawn(function* () {
-                    yield cadesplugin.CreateObjectAsync('CAdESCOM.About')
-                    resolve()
-                }, resolve, reject)
-            }))
-            return true
-        } catch {
-            return false
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (attempt > 0) await new Promise(r => setTimeout(r, 2000))
+            try {
+                await execute(({cadesplugin}) => new Promise((resolve, reject) => {
+                    cadesplugin.async_spawn(function* () {
+                        yield cadesplugin.CreateObjectAsync('CAdESCOM.Certificate')
+                        resolve()
+                    }, resolve, reject)
+                }))
+                return true
+            } catch {}
         }
+        return false
     }
 
     /**

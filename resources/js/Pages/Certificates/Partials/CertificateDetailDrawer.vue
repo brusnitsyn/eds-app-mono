@@ -39,10 +39,14 @@ async function installTrustedCas() {
         for (const ca of props.trustedCas) {
             try {
                 const {data} = await window.axios.get(route("certificates.trusted-ca.content", ca.id))
+                if (!data?.content) {
+                    throw new Error('Файл сертификата отсутствует на сервере')
+                }
                 await installToStore(data.content, ca.type === "root" ? "Root" : "CA")
                 installed++
             } catch (e) {
-                window.$message?.error(`Не удалось установить «${ca.name}»: ${e?.message ?? e}`)
+                const msg = e?.response?.data?.error ?? e?.message ?? String(e)
+                window.$message?.error(`Не удалось установить «${ca.name}»: ${msg}`)
             }
         }
 
