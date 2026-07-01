@@ -1,4 +1,4 @@
-import {execute} from "crypto-pro-actual-cades-plugin"
+import {execute, getSystemInfo as _cadesGetSystemInfo} from "crypto-pro-actual-cades-plugin"
 
 /**
  * Установка сертификата выполняется браузерным плагином КриптоПро (CAdESCOM)
@@ -10,14 +10,12 @@ export function useCadesPlugin() {
     /**
      * Проверяет доступность плагина через реальный вызов CAdESCOM.About.
      * Надёжнее isValidSystemSetup — работает с MV2 и MV3 расширениями.
-     * Возвращает версию плагина или null если плагин недоступен.
      */
     async function isAvailable() {
         try {
             await execute(({cadesplugin}) => new Promise((resolve, reject) => {
                 cadesplugin.async_spawn(function* () {
-                    const oAbout = yield cadesplugin.CreateObjectAsync('CAdESCOM.About')
-                    yield oAbout.PluginVersion
+                    yield cadesplugin.CreateObjectAsync('CAdESCOM.About')
                     resolve()
                 }, resolve, reject)
             }))
@@ -28,22 +26,15 @@ export function useCadesPlugin() {
     }
 
     /**
-     * Возвращает версию плагина и CSP, либо null при ошибке.
+     * Возвращает версию плагина и CSP через штатный API пакета.
      */
     async function getSystemInfo() {
         try {
-            return await execute(({cadesplugin}) => new Promise((resolve, reject) => {
-                cadesplugin.async_spawn(function* () {
-                    const oAbout = yield cadesplugin.CreateObjectAsync('CAdESCOM.About')
-                    const pluginVersion = yield oAbout.PluginVersion
-                    let cspVersion = null
-                    try {
-                        const cspVer = yield oAbout.CSPVersion('', 0)
-                        cspVersion = `${yield cspVer.MajorVersion}.${yield cspVer.MinorVersion}.${yield cspVer.BuildVersion}`
-                    } catch {}
-                    resolve({pluginVersion: String(pluginVersion), cspVersion})
-                }, resolve, reject)
-            }))
+            const info = await _cadesGetSystemInfo()
+            return {
+                pluginVersion: info?.pluginVersion ?? info?.PluginVersion ?? null,
+                cspVersion: info?.cspVersion ?? info?.CspVersion ?? info?.CSPVersion ?? null,
+            }
         } catch {
             return null
         }

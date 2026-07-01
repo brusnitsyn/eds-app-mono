@@ -27,14 +27,19 @@ function checkBrowser() {
 async function checkPlugin() {
     pluginCheck.value.status = STATUS.PENDING
     cspCheck.value.status    = STATUS.PENDING
-    const ok = await isAvailable()
-    pluginCheck.value.status = ok ? STATUS.OK : STATUS.FAIL
-    if (ok) {
-        const info = await getSystemInfo()
-        pluginCheck.value.version = info?.pluginVersion ?? null
-        cspCheck.value = {status: info?.cspVersion ? STATUS.OK : STATUS.FAIL, version: info?.cspVersion ?? null}
-    } else {
-        cspCheck.value.status = STATUS.FAIL
+    try {
+        const ok = await isAvailable()
+        pluginCheck.value.status = ok ? STATUS.OK : STATUS.FAIL
+        if (ok) {
+            const info = await getSystemInfo()
+            pluginCheck.value.version = info?.pluginVersion ?? null
+            cspCheck.value = {status: info?.cspVersion ? STATUS.OK : STATUS.FAIL, version: info?.cspVersion ?? null}
+        } else {
+            cspCheck.value.status = STATUS.FAIL
+        }
+    } catch {
+        pluginCheck.value.status = STATUS.FAIL
+        cspCheck.value.status    = STATUS.FAIL
     }
 }
 

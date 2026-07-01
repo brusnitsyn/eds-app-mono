@@ -53,11 +53,15 @@ class TrustedCertificateAuthorityController extends Controller
      */
     public function content(TrustedCertificateAuthority $trustedCertificateAuthority)
     {
+        if (! Storage::disk('trusted_ca')->exists($trustedCertificateAuthority->file_path)) {
+            return response()->json(['error' => 'Файл сертификата не найден на сервере'], 404);
+        }
+
         $der = Storage::disk('trusted_ca')->get($trustedCertificateAuthority->file_path);
 
         return response()->json([
-            'name' => $trustedCertificateAuthority->name,
-            'type' => $trustedCertificateAuthority->type,
+            'name'    => $trustedCertificateAuthority->name,
+            'type'    => $trustedCertificateAuthority->type,
             'content' => base64_encode($der),
         ]);
     }
@@ -77,8 +81,7 @@ class TrustedCertificateAuthorityController extends Controller
             return $contents;
         }
 
-        $body = preg_replace('/-----(BEGIN|END) CERTIFICATE-----/', '', $contents);
-
-        return base64_decode(trim($body));
+        preg_match('/-----BEGIN CERTIFICATE-----([^-]+)-----END CERTIFICATE-----/s', $contents, $m);
+        return base64_decode(preg_replace('/\s+/', '', $m[1] ?? ''));
     }
 }
