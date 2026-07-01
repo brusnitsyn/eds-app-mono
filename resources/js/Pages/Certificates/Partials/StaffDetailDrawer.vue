@@ -10,6 +10,7 @@ import EdsInputSnils from "@/Components/Eds/EdsInputSnils.vue"
 import EdsDatePicker from "@/Components/Eds/EdsDatePicker.vue"
 import UserRoleModal from "@/Pages/MIS/Users/Partials/UserRoleModal.vue"
 import CreatePostModal from "@/Pages/MIS/Users/Partials/CreatePostModal.vue"
+import CertificateDetailDrawer from "@/Pages/Certificates/Partials/CertificateDetailDrawer.vue"
 
 const show = defineModel("show")
 
@@ -179,6 +180,8 @@ function certDef(row) {
     if (row.cert_status === "valid") return {label: "УКЭП активна", type: "success"}
     return {label: "УКЭП недействительна", type: "error"}
 }
+
+const certDrawerOpen = ref(false)
 </script>
 
 <template>
@@ -339,19 +342,15 @@ function certDef(row) {
 
             <NEmpty v-else description="Локальный сотрудник без учётной записи МИС" class="my-6" />
 
-            <template #footer>
-                <NFlex justify="space-between" style="width: 100%">
-                    <NButton v-if="row.staff_id" tag="a" :href="route('staff.show', {staff: row.staff_id})">
-                        Перейти к сертификату
-                    </NButton>
-                    <NButton v-if="row.mis_user_id" tag="a" :href="route('mis.user', {userId: row.mis_user_id})" secondary>
-                        Открыть в ТМ:МИС
-                    </NButton>
-                </NFlex>
+            <template #footer v-if="row.staff_id && row.cert">
+                <NButton @click="certDrawerOpen = true" style="width: 100%">
+                    Сертификат пользователя
+                </NButton>
             </template>
         </NDrawerContent>
     </NDrawer>
 
+    <CertificateDetailDrawer v-model:show="certDrawerOpen" :certificate="row?.cert" />
     <template v-if="detail">
         <UserRoleModal v-if="detail.x_user" v-model:show="hasShowUserRoleModal" :user="detail.user" :x-user="detail.x_user" :roles="detail.roles" :user-roles="detail.user_roles" :role-templates="detail.role_templates" />
         <CreatePostModal v-model:show="hasShowCreatePostModal" :user="detail.user" :prvd="detail.prvd" :prvs="detail.prvs" :departments="detail.departments" :posts="detail.jobs" :department-types="detail.department_types" :department-profiles="detail.department_profiles" :post="currentPost" />

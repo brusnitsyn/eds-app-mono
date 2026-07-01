@@ -224,6 +224,17 @@ class StaffController extends Controller
         ]);
     }
 
+    public function certDetail(Staff $staff)
+    {
+        $this->authorize('view', $staff);
+
+        $staff = $staff->load(['certification' => function($query) {
+            $query->latest('created_at')->limit(1);
+        }, 'division']);
+
+        return response()->json($staff);
+    }
+
     public function destroy(Staff $staff)
     {
         $this->authorize('delete', $staff);

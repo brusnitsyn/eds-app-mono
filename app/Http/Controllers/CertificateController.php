@@ -413,6 +413,17 @@ class CertificateController extends Controller
             'cert_status' => $certification?->status(),
             'has_certificate' => $certification !== null,
             'source' => 'mis',
+            'cert' => $certification ? [
+                'staff_id' => $staff->id,
+                'fio' => trim("{$doctor['last_name']} {$doctor['first_name']} {$doctor['middle_name']}"),
+                'position' => $doctor['prvd_name'] ?? null,
+                'snils' => $doctor['snils'] ?? null,
+                'status' => $certification->status(),
+                'serial_number' => $certification->serial_number,
+                'valid_from' => $certification->valid_from,
+                'valid_to' => $certification->valid_to,
+                'file_certification' => $certification->file_certification,
+            ] : null,
         ];
     }
 
