@@ -3,257 +3,160 @@
 namespace App\Services;
 
 use App\Data\Mis\XUserMis;
-use App\Facades\MisDoctor;
+use App\Models\Mis\XUser;
+use App\Models\Mis\XUserSettings;
 use App\Models\MisLPUDoctorToUserID;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
+use App\Models\MisPasswordHistory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 
 class MisXUserService
 {
-    // Основная таблица для изменений
-    protected string $table = 'x_User';
-    protected array $relations = [
-        'UserSettings' => [
-            'table' => 'x_UserSettings',
-            'first' => 'x_UserSettings.rf_UserID',
-            'operator' => '=',
-            'second' => 'x_User.UserID'
-        ],
-    ];
-    protected array $baseSelect = [
-        'x_User.UserID', 'x_User.GeneralLogin', 'x_User.GeneralPassword', 'x_User.AuthMode', 'x_User.FIO', 'x_User.GUID'
-    ];
-
     public function getUserById(int $userId): ?XUserMis
     {
-        $wheres = [
-            [
-                'column' => 'UserID',
-                'operator' => '=',
-                'value' => $userId
-            ]
-        ];
-        $builder = $this->getBaseBuilder(null, $this->baseSelect, $wheres);
-        $xUser = $builder->first();
-
-        if (empty($xUser)) {
-            return null;
-        }
-
-        return XUserMis::from($xUser);
+        $user = XUser::find($userId);
+        return $user ? XUserMis::from($user->toArray()) : null;
     }
 
-    public function getUserByGuid(string $userGuid): ?XUserMis
+    public function getUserByGuid(string $guid): ?XUserMis
     {
-        $wheres = [
-            [
-                'column' => 'GUID',
-                'operator' => '=',
-                'value' => $userGuid
-            ]
-        ];
-        $builder = $this->getBaseBuilder(null, $this->baseSelect, $wheres);
-        $xUser = $builder->first();
-
-        if (empty($xUser)) {
-            return null;
-        }
-
-        return XUserMis::from($xUser);
+        $user = XUser::where('GUID', $guid)->first();
+        return $user ? XUserMis::from($user->toArray()) : null;
     }
 
     public function getUserByDoctorId(int $doctorId): ?XUserMis
     {
-        $storedUserID = MisLPUDoctorToUserID::where('lpu_doctor_id', $doctorId)->first();
+        $mapping = MisLPUDoctorToUserID::where('lpu_doctor_id', $doctorId)->first();
 
-        if (!empty($storedUserID)) {
-            $xUser = $this->getUserById($storedUserID->user_id);
+        if ($mapping) {
+            $xUser = $this->getUserById($mapping->user_id);
         } else {
-            $doctor = MisDoctor::getDoctorById($doctorId);
-            $xUser = $this->getUserByDoctorPcod($doctor->code);
+            $doctor = XUser::getConnection()->table('hlt_LPUDoctor')
+                ->select('PCOD')
+                ->where('LPUDoctorID', $doctorId)
+                ->first();
+
+            $xUser = $doctor ? $this->getUserByDoctorPcod($doctor->PCOD) : null;
         }
 
-        if (empty($xUser)) {
-            return null;
+        if ($xUser) {
+            MisLPUDoctorToUserID::updateOrCreate(
+                ['lpu_doctor_id' => $doctorId],
+                ['user_id' => $xUser->UserID, 'lpu_doctor_id' => $doctorId]
+            );
         }
 
-        MisLPUDoctorToUserID::updateOrCreate(['user_id' => $xUser->UserID], [
-            'user_id' => $xUser->UserID,
-            'lpu_doctor_id' => $doctorId
-        ]);
-
-        return XUserMis::from($xUser);
+        return $xUser;
     }
 
-    public function getUserByDoctorPcod(string $doctorPcod): ?XUserMis
+    public function getUserByDoctorPcod(string $pcod): ?XUserMis
     {
-        $relations = ['UserSettings'];
-        $wheres = [
-            [
-                'column' => 'x_UserSettings.Property',
-                'operator' => '=',
-                'value' => 'Код врача'
-            ],
-            [
-                'column' => 'x_UserSettings.ValueStr',
-                'operator' => '=',
-                'value' => $doctorPcod
-            ],
-        ];
-        $builder = $this->getBaseBuilder($relations, $this->baseSelect, $wheres);
-        $xUser = $builder->first();
+        $user = XUser::join('x_UserSettings', 'x_UserSettings.rf_UserID', '=', 'x_User.UserID')
+            ->where('x_UserSettings.Property', 'Код врача')
+            ->where('x_UserSettings.ValueStr', $pcod)
+            ->select(['x_User.UserID', 'x_User.GeneralLogin', 'x_User.GeneralPassword', 'x_User.FIO', 'x_User.GUID', 'x_User.AuthMode'])
+            ->first();
 
-        if (empty($xUser)) {
-            return null;
-        }
+        return $user ? XUserMis::from($user->toArray()) : null;
+    }
 
-        return XUserMis::from($xUser);
+    public function createUser(array $data): ?XUserMis
+    {
+        $guid = Str::uuid()->toString();
+
+        $user = XUser::create([
+            'GeneralLogin'    => $data['GeneralLogin'],
+            'FIO'             => $data['FIO'] ?? '',
+            'AuthMode'        => $data['AuthMode'] ?? 1,
+            'GUID'            => $guid,
+            'GeneralPassword' => $this->computeHash('1234567', $guid),
+        ]);
+
+        return $this->getUserById($user->UserID);
+    }
+
+    public function assignToDoctor(XUserMis $user, string $doctorCode): bool
+    {
+        $base = ['OwnerGUID' => $user->GUID, 'DocTypeDefGUID' => Uuid::NIL, 'rf_UserID' => $user->UserID];
+
+        XUserSettings::create(array_merge($base, [
+            'Property'        => 'Код врача',
+            'ValueStr'        => $doctorCode,
+            'rf_SettingTypeID'=> 7,
+        ]));
+
+        XUserSettings::create(array_merge($base, [
+            'Property'        => 'Автоопределение врача',
+            'ValueInt'        => 1,
+            'rf_SettingTypeID'=> 8,
+        ]));
+
+        XUserSettings::create(array_merge($base, [
+            'Property'        => 'Использование формы мед. документа',
+            'ValueInt'        => 1,
+            'rf_SettingTypeID'=> 8,
+        ]));
+
+        return true;
+    }
+
+    public function updateCredentials(int $userId, string $login, string $password): void
+    {
+        $user = XUser::findOrFail($userId);
+        $user->update([
+            'GeneralLogin'    => $login,
+            'GeneralPassword' => $this->computeHash($password, $user->GUID),
+        ]);
     }
 
     /**
-     * @throws \Throwable
+     * Переключает пароль: сохраняет текущий в историю и ставит дефолтный,
+     * либо восстанавливает оригинальный если история уже есть.
      */
-    public function createUser(array $data): ?XUserMis
+    public function changePassword(int $xUserId): void
     {
-        $data = XUserMis::from($data);
-        $builder = $this->getBaseBuilder();
+        $user = XUser::findOrFail($xUserId);
 
-        DB::transaction(function () use ($builder, $data) {
-            if (empty($data->UserID)) {
-                $data->GUID = Str::uuid()->toString();
-                $data->GeneralPassword = $this->computeHash('1234567', $data->GUID);
+        $history = MisPasswordHistory::where('user_id', $xUserId)->first();
 
-                $builder->insert([
-                    ...$data->except('UserID')->toArray()
-                ]);
-            } else {
-                $builder->updateOrInsert(
-                    ['UserID' => $data->UserID],
-                    $data->except('UserID')->toArray()
-                );
-            }
-        });
-
-        $user = $this->getUserByGuid($data->GUID);
-
-        return $user;
-    }
-
-    public function assignToDoctor(XUserMis $user, $doctorCode)
-    {
-        $settings = [
-            [
-                'rf_UserID' => $user->UserID,
-                'Property' => 'Код врача',
-                'DocTypeDefGUID' => Uuid::NIL,
-                'ValueStr' => $doctorCode,
-                'rf_SettingTypeID' => 7,
-                'OwnerGUID' => $user->GUID
-            ],
-            [
-                'rf_UserID' => $user->UserID,
-                'Property' => 'Автоопределение врача',
-                'DocTypeDefGUID' => Uuid::NIL,
-                'ValueInt' => 1,
-                'rf_SettingTypeID' => 8,
-                'OwnerGUID' => $user->GUID
-            ],
-            [
-                'rf_UserID' => $user->UserID,
-                'Property' => 'Использование формы мед. документа',
-                'DocTypeDefGUID' => Uuid::NIL,
-                'ValueInt' => 1,
-                'rf_SettingTypeID' => 8,
-                'OwnerGUID' => $user->GUID
-            ],
-        ];
-
-        $hasInsert = false;
-
-        foreach ($settings as $setting) {
-            DB::transaction(function () use ($setting, $hasInsert) {
-                $hasInsert = DB::connection('mis')
-                    ->table('x_UserSettings')
-                    ->insert($setting);
-            });
+        if ($history) {
+            $user->update(['GeneralPassword' => $history->original_password]);
+            $history->delete();
+        } else {
+            $newPassword = $this->computeHash('1234567', $user->GUID);
+            MisPasswordHistory::create([
+                'user_id'           => $xUserId,
+                'original_password' => $user->GeneralPassword,
+                'password'          => $newPassword,
+                'guid'              => $user->GUID,
+            ]);
+            $user->update(['GeneralPassword' => $newPassword]);
         }
-
-
-        return $hasInsert;
     }
 
-    public function getLastId()
+    public function formatedLogin(string $fam, string $ot, string $im): string
     {
-        return DB::connection('mis')
-            ->selectOne("SELECT IDENT_CURRENT('$this->table') as UserID")
-            ->UserID;
+        return Str::title($fam)
+            . Str::upper(Str::take($im, 1) ?: '')
+            . Str::upper(Str::take($ot, 1) ?: '');
     }
 
-    public function formatedLogin($fam, $ot, $im) : string
-    {
-        $fam = Str::title($fam);
-        $im = Str::upper(Str::take($im, 1) ?: '');
-        $ot = Str::upper(Str::take($ot, 1) ?: '');
-        return "$fam$im$ot";
-    }
-
-    private function computeHash(string $password, string $guid)
+    public function computeHash(string $password, string $guid): string
     {
         if (!Str::isUuid($guid)) {
             Log::warning('Invalid GUID format provided', ['guid' => $guid]);
             throw new \InvalidArgumentException('The provided GUID is not valid');
         }
 
-        $text = strtoupper($guid);
+        $text  = strtoupper($guid);
         $bytes = $text . $password . $text;
+        $hash  = sha1($bytes, true);
 
-        // Хеширование с использованием Laravel's hash фасада
-        $hash = sha1($bytes, true);
-
-        // 4-1 итерации повторного хеширования
         for ($i = 0; $i < 3; $i++) {
             $hash = sha1($hash, true);
         }
 
         return base64_encode($hash);
-    }
-
-    public function getBaseBuilder(
-        array|null $relations = null,
-        array|null $select = null,
-        array|null $wheres = null): \Illuminate\Database\Query\Builder
-    {
-        $builder = DB::connection('mis')
-            ->table($this->table);
-
-        // Обработка relations
-        if (!empty($relations)) {
-            foreach ($relations as $relationKey) {
-                $relation = Arr::get($this->relations, $relationKey);
-
-                if (is_null($relation)) {
-                    throw new \Error("Связь $relationKey не найдена");
-                }
-
-                $builder->join(...$relation);
-            }
-        }
-
-        // Обработка select
-        if (!empty($select)) {
-            $builder->select($select);
-        }
-
-        // Обработка where
-        if (!empty($wheres)) {
-            foreach ($wheres as $where) {
-                $builder->where(...$where);
-            }
-        }
-
-        return $builder;
     }
 }

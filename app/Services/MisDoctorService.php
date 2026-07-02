@@ -3,486 +3,234 @@
 namespace App\Services;
 
 use App\Data\Mis\DoctorData;
-use App\Data\Mis\InsertLPUDoctorData;
-use App\Data\Mis\InsertPRVDDoctorData;
-use App\Data\Mis\LpuDoctorData;
 use App\Data\Mis\PrvdData;
 use App\Facades\MisClassifier;
+use App\Models\Mis\DocPrvd;
+use App\Models\Mis\LpuDoctor;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Ramsey\Uuid\Uuid;
 
 class MisDoctorService
 {
-    // Основная таблица для изменений
-    protected string $doctorTable = 'hlt_LPUDoctor';
-    // Таблица должностей
-    protected string $prvdTable = 'hlt_DocPRVD';
-
-    protected array $relations = [
-        'hlt_LPUDoctor' => [
-            'oms_PRVS' => [
-                'table' => 'oms_PRVS',
-                'first' => 'hlt_LPUDoctor.rf_PRVSID',
-                'operator' => '=',
-                'second' => 'oms_PRVS.PRVSID'
-            ],
-            'oms_LPU' => [
-                'table' => 'Oms_LPU',
-                'first' => 'hlt_LPUDoctor.rf_LPUID',
-                'operator' => '=',
-                'second' => 'oms_LPU.LPUID'
-            ],
-            'oms_Department' => [
-                'table' => 'oms_Department',
-                'first' => 'hlt_LPUDoctor.rf_DepartmentID',
-                'operator' => '=',
-                'second' => 'oms_Department.DepartmentID'
-            ],
-            'oms_PRVD' => [
-                'table' => 'oms_PRVD',
-                'first' => 'hlt_LPUDoctor.rf_PRVDID',
-                'operator' => '=',
-                'second' => 'oms_PRVD.PRVDID'
-            ],
-        ],
-        'hlt_DocPRVD' => []
-    ];
-    protected array $baseSelect = [
+    private const DOCTOR_SELECT = [
         'hlt_LPUDoctor.LPUDoctorID', 'hlt_LPUDoctor.PCOD', 'hlt_LPUDoctor.OT_V', 'hlt_LPUDoctor.IM_V',
         'hlt_LPUDoctor.FAM_V', 'hlt_LPUDoctor.DR', 'hlt_LPUDoctor.SS', 'hlt_LPUDoctor.UGUID',
         'hlt_LPUDoctor.isDoctor', 'hlt_LPUDoctor.inTime', 'hlt_LPUDoctor.isSpecial', 'hlt_LPUDoctor.isDismissal',
         'oms_PRVS.C_PRVS', 'oms_PRVS.PRVS_NAME', 'hlt_LPUDoctor.DateBegin', 'hlt_LPUDoctor.DateEnd',
         'Oms_LPU.M_NAMES', 'oms_Department.DepartmentName',
-        'oms_PRVD.NAME', 'hlt_LPUDoctor.rf_PRVSID', 'hlt_LPUDoctor.rf_LPUID', 'hlt_LPUDoctor.rf_PRVDID',
-        'hlt_LPUDoctor.rf_DepartmentID'
+        'oms_PRVD.NAME', 'hlt_LPUDoctor.rf_PRVSID', 'hlt_LPUDoctor.rf_LPUID',
+        'hlt_LPUDoctor.rf_PRVDID', 'hlt_LPUDoctor.rf_DepartmentID',
     ];
 
-    protected array $relationsPrvd = [];
-    protected array $baseSelectPrvd = [
-        'hlt_DocPRVD.DocPRVDID',
-        'hlt_DocPRVD.rf_LPUDoctorID',
-        'hlt_DocPRVD.D_PRIK',
-        'hlt_DocPRVD.S_ST',
-        'hlt_DocPRVD.D_END',
-        'hlt_DocPRVD.rf_PRVSID',
-        'hlt_DocPRVD.rf_HealingRoomID',
-        'hlt_DocPRVD.rf_DepartmentID',
-        'hlt_DocPRVD.MainWorkPlace',
-        'hlt_DocPRVD.InTime',
-        'hlt_DocPRVD.GUID',
-        'hlt_DocPRVD.rf_PRVDID',
-        'hlt_DocPRVD.Name',
-        'hlt_DocPRVD.ShownInSchedule',
-        'hlt_DocPRVD.isDismissal',
-        'hlt_DocPRVD.isSpecial',
-        'hlt_DocPRVD.PCOD',
-        'hlt_DocPRVD.rf_kl_FrmrPrvsID',
-        'hlt_DocPRVD.rf_kl_DepartmentProfileID',
+    private const PRVD_SELECT = [
+        'hlt_DocPRVD.DocPRVDID', 'hlt_DocPRVD.rf_LPUDoctorID',
+        'hlt_DocPRVD.D_PRIK', 'hlt_DocPRVD.S_ST', 'hlt_DocPRVD.D_END',
+        'hlt_DocPRVD.rf_PRVSID', 'hlt_DocPRVD.rf_HealingRoomID', 'hlt_DocPRVD.rf_DepartmentID',
+        'hlt_DocPRVD.MainWorkPlace', 'hlt_DocPRVD.InTime', 'hlt_DocPRVD.GUID',
+        'hlt_DocPRVD.rf_PRVDID', 'hlt_DocPRVD.Name', 'hlt_DocPRVD.ShownInSchedule',
+        'hlt_DocPRVD.isDismissal', 'hlt_DocPRVD.isSpecial', 'hlt_DocPRVD.PCOD',
+        'hlt_DocPRVD.rf_kl_FrmrPrvsID', 'hlt_DocPRVD.rf_kl_DepartmentProfileID',
         'hlt_DocPRVD.rf_kl_DepartmentTypeID',
     ];
 
+    private function withJoins(): \Illuminate\Database\Eloquent\Builder
+    {
+        return LpuDoctor::join('oms_PRVS', 'hlt_LPUDoctor.rf_PRVSID', '=', 'oms_PRVS.PRVSID')
+            ->join('Oms_LPU', 'hlt_LPUDoctor.rf_LPUID', '=', 'Oms_LPU.LPUID')
+            ->join('oms_Department', 'hlt_LPUDoctor.rf_DepartmentID', '=', 'oms_Department.DepartmentID')
+            ->join('oms_PRVD', 'hlt_LPUDoctor.rf_PRVDID', '=', 'oms_PRVD.PRVDID')
+            ->select(self::DOCTOR_SELECT);
+    }
 
-    /*
-     * Получение доктора (LPUDoctor) по его коду должности
-     */
     public function getDoctorByPcod(string $code): DoctorData
     {
-        $relations = ['oms_PRVS', 'oms_PRVD', 'oms_LPU', 'oms_Department'];
-        $selects = [
-            ...$this->baseSelect
-        ];
-        $wheres = [
-            [
-                'column' => 'hlt_LPUDoctor.PCOD',
-                'operator' => '=',
-                'value' => $code
-            ]
-        ];
+        $doctor = $this->withJoins()
+            ->where('hlt_LPUDoctor.PCOD', $code)
+            ->firstOrFail();
 
-        $userBuilder = $this->getBaseBuilder($this->doctorTable, $relations, $selects, $wheres);
-
-        $doctor = $userBuilder->first();
-
-        if (empty($doctor)) {
-            throw new \Error('MisDoctor not found');
-        }
-
-        $doctor = DoctorData::from($doctor);
-
-        return $doctor;
+        return DoctorData::from($doctor);
     }
+
     public function getDoctorById(int $id): DoctorData
     {
-        $relations = ['oms_PRVS', 'oms_PRVD', 'oms_LPU', 'oms_Department'];
-        $selects = [
-            ...$this->baseSelect
-        ];
-        $wheres = [
-            [
-                'column' => 'hlt_LPUDoctor.LPUDoctorID',
-                'operator' => '=',
-                'value' => $id
-            ]
-        ];
+        $doctor = $this->withJoins()
+            ->where('hlt_LPUDoctor.LPUDoctorID', $id)
+            ->firstOrFail();
 
-        $userBuilder = $this->getBaseBuilder($this->doctorTable, $relations, $selects, $wheres);
-
-        $doctor = $userBuilder->first();
-
-        if (empty($doctor)) {
-            throw new \Error('MisDoctor not found');
-        }
-
-        $doctor = DoctorData::from($doctor);
-
-        return $doctor;
+        return DoctorData::from($doctor);
     }
+
     public function getDoctorByGuid(string $guid): DoctorData
     {
-        $relations = ['oms_PRVS', 'oms_PRVD', 'oms_LPU', 'oms_Department'];
-        $selects = [
-            ...$this->baseSelect
-        ];
-        $wheres = [
-            [
-                'column' => 'hlt_LPUDoctor.UGUID',
-                'operator' => '=',
-                'value' => $guid
-            ]
-        ];
+        $doctor = $this->withJoins()
+            ->where('hlt_LPUDoctor.UGUID', $guid)
+            ->firstOrFail();
 
-        $userBuilder = $this->getBaseBuilder($this->doctorTable, $relations, $selects, $wheres);
-
-        $doctor = $userBuilder->first();
-
-        if (empty($doctor)) {
-            throw new \Error('MisDoctor not found');
-        }
-
-        $doctor = DoctorData::from($doctor);
-
-        return $doctor;
+        return DoctorData::from($doctor);
     }
-    public function getPaginate(string|null $searchValue, int $pageSize): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+
+    public function getPaginate(string|null $searchValue, int $pageSize): LengthAwarePaginator
     {
-        $selects = [
-            'LPUDoctorID', 'PCOD', 'OT_V', 'IM_V', 'FAM_V', 'DR', 'SS'
-        ];
-        $wheres = [
-            [
-                'column' => 'LPUDoctorID',
-                'operator' => '<>',
-                'value' => 0
-            ]
-        ];
+        $query = LpuDoctor::select(['LPUDoctorID', 'PCOD', 'OT_V', 'IM_V', 'FAM_V', 'DR', 'SS'])
+            ->where('LPUDoctorID', '<>', 0);
 
-        $builder = $this->getBaseBuilder($this->doctorTable, null, $selects, $wheres);
-        $this->applySearch($builder, $searchValue);
-        $builder->orderBy('FAM_V')->orderBy('IM_V')->orderBy('OT_V');
+        $this->applySearch($query, $searchValue);
 
-        $paginated = $builder->paginate($pageSize)->through(function ($item) {
-            return [
-                'id' => $item->LPUDoctorID,
-                'code' => $item->PCOD,
-                'middle_name' => $item->OT_V,
-                'first_name' => $item->IM_V,
-                'last_name' => $item->FAM_V,
-                'brith_at' => $item->DR,
-                'snils' => $item->SS,
-            ];
-        });
-
-        return $paginated;
+        return $query
+            ->orderBy('FAM_V')->orderBy('IM_V')->orderBy('OT_V')
+            ->paginate($pageSize)
+            ->through(fn($d) => [
+                'id'          => $d->LPUDoctorID,
+                'code'        => $d->PCOD,
+                'middle_name' => $d->OT_V,
+                'first_name'  => $d->IM_V,
+                'last_name'   => $d->FAM_V,
+                'brith_at'    => $d->DR,
+                'snils'       => $d->SS,
+            ]);
     }
 
-    /**
-     * Количество врачей по тому же критерию поиска, что и getPaginate()/getSlice() —
-     * нужно отдельно, чтобы вычислить общий total при объединении с локальным Staff.
-     */
     public function countDoctors(string|null $searchValue): int
     {
-        $wheres = [
-            [
-                'column' => 'LPUDoctorID',
-                'operator' => '<>',
-                'value' => 0
-            ]
-        ];
-
-        $builder = $this->getBaseBuilder($this->doctorTable, null, null, $wheres);
-        $this->applySearch($builder, $searchValue);
-
-        return $builder->count();
+        $query = LpuDoctor::where('LPUDoctorID', '<>', 0);
+        $this->applySearch($query, $searchValue);
+        return $query->count();
     }
 
-    /**
-     * Произвольный диапазон врачей (offset/limit, а не номер "страницы") — нужен
-     * для постраничного объединения МИС-врачей с локальными Staff-записями без
-     * привязки к МИС в разделе «Сотрудники». LEFT JOIN (а не getBaseBuilder()'s
-     * relations-механизм, который делает INNER JOIN) — иначе врач без проставленной
-     * должности/отделения в МИС молча выпадал бы из списка.
-     */
     public function getSlice(string|null $searchValue, int $offset, int $limit): Collection
     {
-        $builder = DB::connection('mis')->table('hlt_LPUDoctor')
-            ->leftJoin('oms_PRVD', 'hlt_LPUDoctor.rf_PRVDID', '=', 'oms_PRVD.PRVDID')
+        $query = LpuDoctor::leftJoin('oms_PRVD', 'hlt_LPUDoctor.rf_PRVDID', '=', 'oms_PRVD.PRVDID')
             ->leftJoin('oms_Department', 'hlt_LPUDoctor.rf_DepartmentID', '=', 'oms_Department.DepartmentID')
             ->select([
-                'hlt_LPUDoctor.LPUDoctorID', 'hlt_LPUDoctor.PCOD', 'hlt_LPUDoctor.OT_V', 'hlt_LPUDoctor.IM_V',
-                'hlt_LPUDoctor.FAM_V', 'hlt_LPUDoctor.DR', 'hlt_LPUDoctor.SS',
-                'oms_PRVD.NAME as prvd_name', 'oms_Department.DepartmentName as department_name',
+                'hlt_LPUDoctor.LPUDoctorID', 'hlt_LPUDoctor.PCOD',
+                'hlt_LPUDoctor.OT_V', 'hlt_LPUDoctor.IM_V', 'hlt_LPUDoctor.FAM_V',
+                'hlt_LPUDoctor.DR', 'hlt_LPUDoctor.SS',
+                'oms_PRVD.NAME as prvd_name',
+                'oms_Department.DepartmentName as department_name',
             ])
             ->where('hlt_LPUDoctor.LPUDoctorID', '<>', 0);
 
-        $this->applySearch($builder, $searchValue, 'hlt_LPUDoctor.');
+        $this->applySearch($query, $searchValue, 'hlt_LPUDoctor.');
 
-        return $builder
+        return $query
             ->orderBy('hlt_LPUDoctor.FAM_V')->orderBy('hlt_LPUDoctor.IM_V')->orderBy('hlt_LPUDoctor.OT_V')
             ->offset($offset)->limit($limit)
             ->get()
-            ->map(function ($item) {
-                return [
-                    'id' => $item->LPUDoctorID,
-                    'code' => $item->PCOD,
-                    'middle_name' => $item->OT_V,
-                    'first_name' => $item->IM_V,
-                    'last_name' => $item->FAM_V,
-                    'brith_at' => $item->DR,
-                    'snils' => $item->SS,
-                    'prvd_name' => $item->prvd_name,
-                    'department_name' => $item->department_name,
-                ];
-            });
+            ->map(fn($d) => [
+                'id'              => $d->LPUDoctorID,
+                'code'            => $d->PCOD,
+                'middle_name'     => $d->OT_V,
+                'first_name'      => $d->IM_V,
+                'last_name'       => $d->FAM_V,
+                'brith_at'        => $d->DR,
+                'snils'           => $d->SS,
+                'prvd_name'       => $d->prvd_name,
+                'department_name' => $d->department_name,
+            ]);
     }
 
-    private function applySearch(\Illuminate\Database\Query\Builder $builder, string|null $searchValue, string $columnPrefix = ''): void
+    public function createDoctor(DoctorData $data, bool $hasCreatePrvd = false): DoctorData
     {
+        $guid = $data->guid;
+
+        try {
+            DB::connection('mis')->beginTransaction();
+
+            $attrs = $data->except('rate', 'id', 'prvs_code', 'prvs_name', 'lpu_name', 'department_name', 'prvd_name', 'has_password_change')
+                ->toArray();
+            LpuDoctor::create($attrs);
+
+            $doctor = $this->getDoctorByGuid($guid);
+
+            if ($hasCreatePrvd) {
+                $prvdCount = DocPrvd::where('rf_LPUDoctorID', $doctor->id)->count();
+                $prvd = MisClassifier::getPrvd()->firstWhere('id', $data->prvd_id);
+
+                $this->createPrvd(PrvdData::from([
+                    'doctor_id'       => $doctor->id,
+                    'code'            => $doctor->code . '-' . ($prvdCount + 1),
+                    'start_at'        => CarbonImmutable::now()->toDateTime(),
+                    'resource_type_id'=> 1,
+                    'rate'            => 1.00,
+                    'in_time'         => 0,
+                    'is_special'      => 0,
+                    'is_dismissal'    => 0,
+                    'shown_in_schedule' => 0,
+                    'main_work_place' => 1,
+                    'prvs_id'         => $data->prvs_id,
+                    'department_id'   => $data->department_id,
+                    'prvd_id'         => $data->prvd_id,
+                    'guid'            => Str::uuid(),
+                    'frmr_prvd_id'    => $prvd->code ?? 0,
+                    'name'            => $prvd->name ?? '',
+                ]));
+            }
+
+            DB::connection('mis')->commit();
+            return $doctor;
+        } catch (\Exception $e) {
+            DB::connection('mis')->rollBack();
+            Log::error($e->getMessage());
+            throw new \Exception('Ошибка при создании врача');
+        }
+    }
+
+    public function updateDoctor(int $id, DoctorData $data): void
+    {
+        LpuDoctor::where('LPUDoctorID', $id)
+            ->update(
+                $data->except('id', 'start_at', 'end_at', 'prvs_code', 'prvs_name', 'lpu_name', 'department_name', 'prvd_name', 'has_password_change')
+                    ->toArray()
+            );
+    }
+
+    public function getPrvd(int $doctorId): Collection
+    {
+        return DocPrvd::select(self::PRVD_SELECT)
+            ->where('rf_LPUDoctorID', $doctorId)
+            ->get()
+            ->map(fn($p) => PrvdData::from($p)->toOriginal());
+    }
+
+    public function createPrvd(PrvdData $data): PrvdData
+    {
+        DocPrvd::create($data->except('id')->toArray());
+        return $this->getPrvdByGuid($data->guid);
+    }
+
+    public function updatePrvd(PrvdData $data): void
+    {
+        DocPrvd::where('DocPRVDID', $data->id)
+            ->update($data->except('id', 'guid')->toArray());
+    }
+
+    private function getPrvdByGuid(string $guid): PrvdData
+    {
+        return PrvdData::from(
+            DocPrvd::select(self::PRVD_SELECT)->where('GUID', $guid)->firstOrFail()
+        );
+    }
+
+    private function applySearch(
+        \Illuminate\Database\Eloquent\Builder $query,
+        string|null $searchValue,
+        string $prefix = ''
+    ): void {
         if (empty($searchValue)) {
             return;
         }
 
-        if (intval($searchValue) != 0) {
-            $builder->where("{$columnPrefix}PCOD", 'like', "$searchValue%");
+        if (intval($searchValue) !== 0) {
+            $query->where("{$prefix}PCOD", 'like', "$searchValue%");
         } else {
-            $builder->whereRaw("CONCAT({$columnPrefix}FAM_V, ' ', {$columnPrefix}IM_V, ' ', {$columnPrefix}OT_V) LIKE ?", ["$searchValue%"]);
+            $query->whereRaw(
+                "CONCAT({$prefix}FAM_V, ' ', {$prefix}IM_V, ' ', {$prefix}OT_V) LIKE ?",
+                ["$searchValue%"]
+            );
         }
-    }
-
-    /**
-     * @throws \Throwable
-     */
-    public function createDoctor(DoctorData $data, bool $hasCreatePrvd = false): DoctorData
-    {
-        $doctorGuid = $data->guid;
-        $prvdGuid = Str::uuid();
-
-        try {
-            DB::connection('mis')->beginTransaction();
-
-            $hasInsert = $this->getBaseBuilder($this->doctorTable)
-                ->insert($data->except('rate', 'id')->toArray());
-
-            if ($hasInsert === false) {
-                throw new \Exception('Ошибка при вставки');
-            }
-
-            $doctor = $this->getDoctorByGuid($doctorGuid);
-
-            if (!$hasCreatePrvd) {
-                DB::connection('mis')->commit();
-                return $doctor;
-            }
-
-            $doctorPrvds = $this->getPrvd($doctor->id)->count();
-
-            $prvd = MisClassifier::getPrvd()->where('id', $data->prvd_id)->first();
-
-//            department_profile_id, department_type_id, main_work_place, in_time, shown_in_schedule, is_dismissal, is_special
-            $doctorPrvd = PrvdData::from([
-                'doctor_id' => $doctor->id,
-                'code' => $doctor->code . '-' . $doctorPrvds + 1,
-                'start_at' => CarbonImmutable::now()->toDateTime(),
-                'resource_type_id' => 1,
-                'rate' => 1.00,
-                'in_time' => 0,
-                'is_special' => 0,
-                'is_dismissal' => 0,
-                'shown_in_schedule' => 0,
-                'main_work_place' => 1,
-                'prvs_id' => $data->prvs_id,
-                'department_id' => $data->department_id,
-                'prvd_id' => $data->prvd_id,
-                'guid' => $prvdGuid,
-                'frmr_prvd_id' => $prvd->code,
-                'name' => $prvd->name,
-            ]);
-
-            $this->createPrvd($doctorPrvd);
-
-            DB::connection('mis')->commit();
-
-            return $doctor;
-        } catch (\Exception $e) {
-            DB::connection('mis')->rollBack();
-            Log::error($e->getMessage());
-            throw new \Exception('Ошибка при вставки');
-        }
-    }
-
-    public function updateDoctor(DoctorData $data): DoctorData
-    {
-        try {
-            DB::connection('mis')->beginTransaction();
-
-            $hasUpdate = $this->getBaseBuilder($this->doctorTable)
-                ->where('UGUID', $data->guid)
-                ->update(...$data->except('rate')->toArray());
-
-            $doctor = $this->getDoctorByGuid($data->guid);
-
-            DB::connection('mis')->commit();
-
-            return $doctor;
-        } catch (\Exception $e) {
-            DB::connection('mis')->rollBack();
-            Log::error($e->getMessage());
-            throw new \Exception('Ошибка при вставки');
-        }
-    }
-
-    /**
-     * @throws \Throwable
-     */
-    public function createPrvd(PrvdData $data) : PrvdData|bool
-    {
-        $builder = $this->getBaseBuilder($this->prvdTable);
-        DB::transaction(function () use ($builder, $data) {
-            $data = $data->toArray();
-            if (empty($data['DocPRVDID'])) {
-                $builder->insert([
-                    ...$data
-                ]);
-            } else {
-                $builder->updateOrInsert(
-                    ['DocPRVDID' => $data['DocPRVDID']],
-                    $data
-                );
-            }
-        });
-
-        $prvd = $this->getPrvd(guid: $data->guid);
-
-        return $prvd;
-    }
-
-    public function getPrvd(int $doctor_id = null, int $id = null, string $code = null, string $guid = null) : Collection|PrvdData|bool
-    {
-        $wheres = [];
-
-        if (!empty($doctor_id)) {
-            $wheres = [
-                [
-                    'column' => "$this->prvdTable.rf_LPUDoctorID",
-                    'operator' => '=',
-                    'value' => $doctor_id
-                ]
-            ];
-
-            $prvds = $this->getBaseBuilder($this->prvdTable, null, $this->baseSelectPrvd, $wheres)->get()
-                ->map(function ($prvd) {
-                    return PrvdData::from($prvd)->toOriginal();
-                });
-
-            if (empty($prvds)) {
-                return false;
-            }
-
-            return $prvds;
-        }
-        if (!empty($id)) {
-            $wheres = [
-                [
-                    'column' => "$this->prvdTable.DocPRVDID",
-                    'operator' => '=',
-                    'value' => $id
-                ]
-            ];
-        }
-        if (!empty($code)) {
-            $wheres = [
-                [
-                    'column' => "$this->prvdTable.PCOD",
-                    'operator' => '=',
-                    'value' => $code
-                ]
-            ];
-        }
-        if (!empty($guid)) {
-            $wheres = [
-                [
-                    'column' => "$this->prvdTable.GUID",
-                    'operator' => '=',
-                    'value' => $guid
-                ]
-            ];
-        }
-
-        $prvd = $this->getBaseBuilder($this->prvdTable, null, $this->baseSelectPrvd, $wheres)->first();
-
-        if (empty($prvd)) {
-            return false;
-        }
-
-        return PrvdData::from($prvd);
-    }
-
-    public function getSearchedDoctor(string $fio, string|null $pcod = null)
-    {
-
-    }
-
-    public function getBaseBuilder(
-        string $table = null,
-        array|null $relations = null,
-        array|null $select = null,
-        array|null $wheres = null): \Illuminate\Database\Query\Builder
-    {
-        $builder = DB::connection('mis')
-            ->table($table);
-
-        // Обработка relations
-        if (!empty($relations)) {
-            $relationsTable = Arr::get($this->relations, $table);
-            foreach ($relations as $relationKey) {
-
-                $relation = Arr::get($relationsTable, $relationKey);
-
-                if (is_null($relation)) {
-                    throw new \Error("Связь $relationKey не найдена");
-                }
-
-                $builder->join(...$relation);
-            }
-        }
-
-        // Обработка select
-        if (!empty($select)) {
-            $builder->select($select);
-        }
-
-        // Обработка where
-        if (!empty($wheres)) {
-            foreach ($wheres as $where) {
-                $builder->where(...$where);
-            }
-        }
-
-        return $builder;
     }
 }

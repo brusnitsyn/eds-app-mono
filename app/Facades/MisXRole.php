@@ -2,10 +2,13 @@
 
 namespace App\Facades;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @method static foo(string $args)
+ * @method static Collection getRoles()
+ * @method static Collection getRolesByUserId(int $userId)
+ * @method static void syncRoles(int $userId, array $roleIds)
  *
  * @see \App\Services\MisXRoleService
  */
