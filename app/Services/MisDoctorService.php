@@ -17,13 +17,29 @@ use Illuminate\Support\Str;
 class MisDoctorService
 {
     private const DOCTOR_SELECT = [
-        'hlt_LPUDoctor.LPUDoctorID', 'hlt_LPUDoctor.PCOD', 'hlt_LPUDoctor.OT_V', 'hlt_LPUDoctor.IM_V',
-        'hlt_LPUDoctor.FAM_V', 'hlt_LPUDoctor.DR', 'hlt_LPUDoctor.SS', 'hlt_LPUDoctor.UGUID',
-        'hlt_LPUDoctor.isDoctor', 'hlt_LPUDoctor.inTime', 'hlt_LPUDoctor.isSpecial', 'hlt_LPUDoctor.isDismissal',
-        'oms_PRVS.C_PRVS', 'oms_PRVS.PRVS_NAME', 'hlt_LPUDoctor.DateBegin', 'hlt_LPUDoctor.DateEnd',
-        'Oms_LPU.M_NAMES', 'oms_Department.DepartmentName',
-        'oms_PRVD.NAME', 'hlt_LPUDoctor.rf_PRVSID', 'hlt_LPUDoctor.rf_LPUID',
-        'hlt_LPUDoctor.rf_PRVDID', 'hlt_LPUDoctor.rf_DepartmentID',
+        'hlt_LPUDoctor.LPUDoctorID as id',
+        'hlt_LPUDoctor.PCOD as code',
+        'hlt_LPUDoctor.OT_V as middle_name',
+        'hlt_LPUDoctor.IM_V as first_name',
+        'hlt_LPUDoctor.FAM_V as last_name',
+        'hlt_LPUDoctor.DR as brith_at',
+        'hlt_LPUDoctor.SS as snils',
+        'hlt_LPUDoctor.UGUID as guid',
+        'hlt_LPUDoctor.isDoctor as is_doctor',
+        'hlt_LPUDoctor.inTime as in_time',
+        'hlt_LPUDoctor.isSpecial as is_special',
+        'hlt_LPUDoctor.isDismissal as is_dismissal',
+        'oms_PRVS.C_PRVS as prvs_code',
+        'oms_PRVS.PRVS_NAME as prvs_name',
+        'hlt_LPUDoctor.DateBegin as start_at',
+        'hlt_LPUDoctor.DateEnd as end_at',
+        'Oms_LPU.M_NAMES as lpu_name',
+        'oms_Department.DepartmentName as department_name',
+        'oms_PRVD.NAME as prvd_name',
+        'hlt_LPUDoctor.rf_PRVSID as prvs_id',
+        'hlt_LPUDoctor.rf_LPUID as lpu_id',
+        'hlt_LPUDoctor.rf_PRVDID as prvd_id',
+        'hlt_LPUDoctor.rf_DepartmentID as department_id',
     ];
 
     private const PRVD_SELECT = [
