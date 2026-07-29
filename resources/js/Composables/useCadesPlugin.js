@@ -35,8 +35,8 @@ export function useCadesPlugin() {
         try {
             const info = await _cadesGetSystemInfo()
             return {
-                pluginVersion: info?.pluginVersion ?? info?.PluginVersion ?? null,
-                cspVersion: info?.cspVersion ?? info?.CspVersion ?? info?.CSPVersion ?? null,
+                pluginVersion: info?.cadesVersion ?? null,
+                cspVersion: info?.cspVersion ?? null,
             }
         } catch {
             return null
@@ -57,22 +57,48 @@ export function useCadesPlugin() {
 
         return execute(({cadesplugin}) => new Promise((resolve, reject) => {
             cadesplugin.async_spawn(function* () {
-                var oCertificate = yield cadesplugin.CreateObjectAsync("CAdESCOM.Certificate")
-                yield oCertificate.Import(clean)
-
-                var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store")
-                yield oStore.Open(
-                    cadesplugin.CAPICOM_CURRENT_USER_STORE,
-                    storeName,
-                    cadesplugin.CAPICOM_STORE_OPEN_READ_WRITE
-                )
-
                 try {
-                    yield oStore.Add(oCertificate)
-                } finally {
-                    yield oStore.Close()
+                    // Создаём и импортируем сертификат
+                    const oCertificate = yield cadesplugin.CreateObjectAsync("CAdESCOM.Certificate");
+                    yield oCertificate.Import(clean);
+
+                    // Открываем хранилище
+                    const oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+                    yield oStore.Open(
+                        cadesplugin.CAPICOM_CURRENT_USER_STORE,
+                        storeName,
+                        cadesplugin.CAPICOM_STORE_OPEN_READ_WRITE
+                    );
+
+                    // Проверяем, есть ли уже такой сертификат (по отпечатку)
+                    const certs = yield oStore.Certificates; // коллекция
+                    let exists = false;
+                    const count = yield certs.Count;
+                    for (let i = 1; i <= count; i++) {
+                        const cert = yield certs.Item(i);
+                        const certThumbprint = yield oCertificate.Thumbprint
+                        const installedThumbprint = yield cert.Thumbprint
+                        if (certThumbprint === installedThumbprint) {
+                            exists = true;
+                            break;
+                        }
+                    }
+
+                    // Добавляем, только если отсутствует
+                    if (!exists) {
+                        yield oStore.Add(oCertificate);
+                        console.log('Сертификат добавлен в ' + storeName);
+                    } else {
+                        console.log('Сертификат уже есть в ' + storeName + ', пропускаем');
+                    }
+
+                    yield oStore.Close();
+                    resolve();
+                } catch (e) {
+                    console.error('Ошибка:', e.message);
+                    reject(e);
                 }
-            }, resolve, reject)
+            }, resolve, reject);
         }))
     }
 
