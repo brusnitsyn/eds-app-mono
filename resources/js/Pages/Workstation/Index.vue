@@ -21,7 +21,25 @@ function checkBrowser() {
     const ua = navigator.userAgent
     const isGost = /Chromium GOST/i.test(ua)
     const ver = ua.match(/Chrome\/([\d.]+)/)?.[1] ?? null
-    browserCheck.value = {status: isGost ? STATUS.OK : STATUS.FAIL, version: isGost ? ver : null}
+    const compareVer = compareVersions(ver, props.software.chromium_gost.version)
+    browserCheck.value = {
+        status: isGost && compareVer === 0 ? STATUS.OK : STATUS.FAIL,
+        version: isGost ? ver : null
+    }
+}
+
+function compareVersions(v1, v2) {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    const maxLen = Math.max(parts1.length, parts2.length);
+
+    for (let i = 0; i < maxLen; i++) {
+        const num1 = i < parts1.length ? parts1[i] : 0;
+        const num2 = i < parts2.length ? parts2[i] : 0;
+        if (num1 > num2) return 1;
+        if (num1 < num2) return -1;
+    }
+    return 0; // версии равны
 }
 
 async function checkPlugin() {
@@ -33,7 +51,11 @@ async function checkPlugin() {
         if (ok) {
             const info = await getSystemInfo()
             pluginCheck.value.version = info?.pluginVersion ?? null
-            cspCheck.value = {status: info?.cspVersion ? STATUS.OK : STATUS.FAIL, version: info?.cspVersion ?? null}
+            const compareVer = compareVersions(info?.cspVersion, props.software.chromium_gost.version)
+            cspCheck.value = {
+                status: info?.cspVersion && compareVer === 0 ? STATUS.OK : STATUS.FAIL,
+                version: info?.cspVersion ?? null
+            }
         } else {
             cspCheck.value.status = STATUS.FAIL
         }
@@ -64,7 +86,6 @@ const allOk      = computed(() => [browserCheck, pluginCheck, cspCheck].every(c 
         </template>
 
         <NFlex vertical :size="16" style="max-width:680px">
-
             <NAlert v-if="allOk" type="success" title="Рабочее место готово к работе">
                 Все необходимые компоненты обнаружены и работают корректно.
             </NAlert>
